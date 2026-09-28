@@ -13,6 +13,7 @@ or “fog long take” without typing tags by hand.
 - **A calm grid, like are.na.** Thumbnails for every kind of image (HEIC, PSD, TIFF, SVG, RAW, …),
   the first lines of every memo and document (txt, md, rtf, docx, hwp, pdf, …), video frames, link previews and font specimens,
   each titled with its file name and format (`poster.jpg`). Set in Helvetica. Sub-folders work like channels.
+  See it as blocks, as a table or as a plain index of names.
 - **Search that just works.** Type any part of a word, in any language. It looks at file names, the text inside documents,
   and everything the AI wrote about each block. `#tag` filters by an exact tag.
 - **Automatic tags, out of sight.** For every new block the AI writes 6–12 tags, a title, a one-line summary and search
@@ -152,8 +153,13 @@ to stay awake when the display is off.
   YouTube and Vimeo play right in the archive. Pasting a link to an image saves the image itself.
 - **Memos** are Markdown files. Open one and press **Edit** to change it; it's re-tagged after you save.
 - **Search:** click the magnifier next to the title. Any part of any word, any language. Combine words (`red poster`),
-  use `#tag` for an exact tag, and narrow down with folders (channels) and the type filter. **Shuffle** is good for
-  rediscovering things.
+  use `#tag` for an exact tag, and narrow down with folders (channels).
+- **Type, View, Order:** hover one of the three words above the grid (or tap it on a phone).
+  **Type** shows only images, videos, text, PDFs, links or everything else. **View** switches between blocks, a table
+  and an index of names (hover a name to see its picture). **Order**: relevance (when searching), recently updated,
+  newest, oldest or alphabetical.
+- **Shuffle** (the green button, in the block view) deals the blocks out again in a random order. Good for rediscovering things.
+- **Descriptions:** open a block and click *No description* to write one. It's saved as you type, and it's searchable.
 - **Your own tags:** open a block and press **+ tag**. Click one of your tags to see everything that has it.
 - **Keyboard:** `/` or ⌘K to search, ← → to move between blocks, Esc to close a block or end a search.
 - **Delete** moves the file to a `.trash` folder inside your library, so you can always get it back.
@@ -224,9 +230,9 @@ retried on another model automatically.
 - **Only for search:** the page never shows what the AI wrote. Blocks are titled with their file name and format
   (`IMG_2931.jpg`), and the AI's tags, title and summary are only used to find things.
 - **Your own tags** (**+ tag**) are the only tags shown; × removes one.
-- **Tags travel with your files:** they're also saved as small JSON files in `<library>/.archive/meta/`, keyed by the
-  file's content. They sync with your drive, so a second computer (or a fresh install) gets every tag back without tagging
-  again. Renaming or moving a file keeps its tags.
+- **Tags and descriptions travel with your files:** they're also saved as small JSON files in `<library>/.archive/meta/`,
+  keyed by the file's content. They sync with your drive, so a second computer (or a fresh install) gets every tag and
+  description back without tagging again. Renaming or moving a file keeps them.
 - **Set `AUTO_TAG=off`** to never send anything anywhere.
 
 ## What it can show

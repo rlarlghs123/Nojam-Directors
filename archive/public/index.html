@@ -32,14 +32,8 @@
     <nav class="folders" id="folders" aria-label="Folders"></nav>
 
     <div class="filters">
-      <div class="kinds" id="kinds" role="group" aria-label="Type"></div>
-      <label class="sort muted">Sort
-        <select id="sort">
-          <option value="">Newest</option>
-          <option value="old">Oldest</option>
-          <option value="random">Shuffle</option>
-        </select>
-      </label>
+      <div class="menus" id="menus"></div>
+      <button id="shuffle" class="shuffle" type="button">Shuffle</button>
     </div>
 
     <div class="active-filters" id="active-filters"></div>
@@ -53,6 +47,7 @@
   <div id="dropzone" class="dropzone" hidden><div id="dropzone-label">Drop to add</div></div>
   <div id="toasts" class="toasts" aria-live="polite"></div>
   <input id="file-input" type="file" multiple hidden>
+  <img id="peek" class="peek" alt="" hidden>
 
   <script type="module" src="/app.js"></script>
 </body>

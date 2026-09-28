@@ -117,12 +117,13 @@ export async function createApp(config, { client } = {}) {
 
   app.patch('/api/items/:id', async (req, res) => {
     const { id } = itemOr404(req);
-    const { addTags = [], removeTags = [], text } = req.body || {};
+    const { addTags = [], removeTags = [], text, description } = req.body || {};
     const add = [].concat(addTags).map(normalizeTag).filter(Boolean);
     const remove = [].concat(removeTags).map(normalizeTag).filter(Boolean);
     for (const t of add) store.addUserTag(id, t);
     for (const t of remove) store.removeTag(id, t);
-    if (add.length || remove.length) {
+    if (typeof description === 'string') store.updateItem(id, { description: description.trim().slice(0, 2000) || null });
+    if (add.length || remove.length || typeof description === 'string') {
       await library.saveSidecar(id);
       events.emit('item', library.present(store.getItem(id)));
     }

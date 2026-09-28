@@ -28,8 +28,6 @@ function ago(ms) {
   }
   return 'just now';
 }
-const shortDate = (ms) =>
-  Date.now() - ms < 6 * 86400000 ? ago(ms) : new Date(ms).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 function bytes(n) {
   if (!n) return '0 B';
   const u = ['B', 'KB', 'MB', 'GB', 'TB'];
@@ -144,14 +142,27 @@ async function api(path, opts = {}) {
 
 // ---------- state ----------
 
-const KINDS = [
+// The Type / View / Order menus above the grid.
+const TYPES = [
   ['', 'All'],
-  ['image', 'Images'],
+  ['image', 'Image'],
   ['video', 'Video'],
   ['text', 'Text'],
   ['pdf', 'PDF'],
   ['link', 'Links'],
-  ['audio,font,design,file', 'Other'],
+  ['audio,font,design,file', 'Others'],
+];
+const VIEWS = [
+  ['block', 'Block'],
+  ['table', 'Table'],
+  ['index', 'Index'],
+];
+const ORDERS = [
+  ['relevance', 'Relevance'],
+  ['updated', 'Updated recently'],
+  ['new', 'Newest'],
+  ['old', 'Oldest'],
+  ['alpha', 'Alphabetical'],
 ];
 const PAGE = 60;
 
@@ -161,7 +172,9 @@ const state = {
   folder: '',
   kind: '',
   sort: '',
+  view: 'block',
   seed: Math.floor(Math.random() * 1e9),
+  reveal: false, // after Shuffle: let the blocks appear one by one, in random order
   items: [],
   total: 0,
   done: false,
@@ -171,6 +184,7 @@ const state = {
   openId: null,
   pushedDetail: false,
   editing: false,
+  deferredDetail: null, // fresh data for the open block, held back while you type its description
 };
 
 const grid = $('#grid');
@@ -186,9 +200,24 @@ function readUrl() {
   state.folder = p.get('folder') || '';
   state.kind = p.get('kind') || '';
   state.sort = p.get('sort') || '';
+  state.view = VIEWS.some(([v]) => v === p.get('view')) ? p.get('view') : savedView();
   $('#q').value = state.q;
-  $('#sort').value = state.sort;
   return Number(p.get('item')) || null;
+}
+
+// The view you picked last is remembered in this browser.
+function savedView() {
+  try {
+    const v = localStorage.getItem('archive-view');
+    return VIEWS.some(([x]) => x === v) ? v : 'block';
+  } catch {
+    return 'block';
+  }
+}
+function saveView(v) {
+  try {
+    localStorage.setItem('archive-view', v);
+  } catch {}
 }
 
 function urlFor({ item = state.openId, ...over } = {}) {
@@ -199,6 +228,7 @@ function urlFor({ item = state.openId, ...over } = {}) {
   if (s.folder) p.set('folder', s.folder);
   if (s.kind) p.set('kind', s.kind);
   if (s.sort) p.set('sort', s.sort);
+  if (s.view !== 'block') p.set('view', s.view);
   if (item) p.set('item', item);
   const qs = p.toString();
   return qs ? `?${qs}` : location.pathname;
@@ -222,7 +252,8 @@ async function load({ reset = false } = {}) {
     state.done = false;
     addCellEl ||= addCell();
     addCellEl.title = state.folder ? `Add to ${state.folder.split('/').pop()}` : '';
-    grid.replaceChildren(addCellEl);
+    grid.className = `grid view-${state.view}`;
+    grid.replaceChildren(...(state.view === 'table' ? [tableHead()] : []), addCellEl);
     renderHeading();
   }
   if (state.loading || state.done) return;
@@ -234,10 +265,17 @@ async function load({ reset = false } = {}) {
     const data = await api(`/api/items?${p}`, { signal: ctrl.signal });
     if (state.loading !== ctrl) return;
     state.total = data.total;
+    const reveal = state.reveal && state.view === 'block';
+    state.reveal = false;
     for (const it of data.items) {
       if (state.items.some((x) => x.id === it.id)) continue;
       state.items.push(it);
-      grid.append(block(it));
+      const el = itemEl(it);
+      if (reveal) {
+        el.classList.add('reveal');
+        el.style.animationDelay = `${Math.round(Math.random() * 900)}ms`;
+      }
+      grid.append(el);
     }
     state.done = data.items.length < PAGE;
     renderHeading();
@@ -330,54 +368,101 @@ function frameFor(it) {
   return frame;
 }
 
-/** The second caption line: size, length, pages or site. The format is already in the file name. */
-function facts(it) {
-  if (['image', 'design'].includes(it.kind) && it.width && it.height) return `${it.width} × ${it.height}`;
-  if (['video', 'audio'].includes(it.kind) && it.duration) return clock(it.duration);
-  if (it.kind === 'pdf' && it.pages) return `${it.pages} ${it.pages === 1 ? 'page' : 'pages'}`;
-  if (it.kind === 'link') return it.meta?.site || 'link';
-  return bytes(it.size);
-}
-
+/** Hovering a block shows just its file name and format. */
 function caption(it) {
-  return h('div', { class: 'caption' },
-    h('div', { class: 't' }, it.title),
-    h('div', { class: 's' }, `${facts(it)} · ${shortDate(it.addedAt)}`));
+  return h('div', { class: 'caption' }, h('div', { class: 't' }, it.title));
 }
 
-function block(it) {
-  const a = h('a', { class: 'block', href: urlFor({ item: it.id }), 'data-id': it.id }, frameFor(it), caption(it));
+/** Clicking anything that stands for an item opens it (⌘/Ctrl-click still opens a new tab). */
+function opens(a, it) {
   a._item = it;
   a.addEventListener('click', (e) => {
     if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
     e.preventDefault();
+    hidePeek();
     openDetail(it.id, { push: true });
   });
   return a;
 }
+
+function block(it) {
+  return opens(h('a', { class: 'block', href: urlFor({ item: it.id }), 'data-id': it.id }, frameFor(it), caption(it)), it);
+}
+
+const dayDate = (ms) => new Date(ms).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+
+function tableHead() {
+  return h('div', { class: 'trow thead', 'aria-hidden': 'true' },
+    h('span'), h('span', {}, 'Name'), h('span', { class: 'c-type' }, 'Type'), h('span', { class: 'c-size' }, 'Size'),
+    h('span', { class: 'c-folder' }, 'Folder'), h('span', { class: 'c-date' }, 'Added'), h('span', { class: 'c-date c-updated' }, 'Updated'));
+}
+
+function tableRow(it) {
+  return opens(h('a', { class: 'trow', href: urlFor({ item: it.id }), 'data-id': it.id },
+    h('span', { class: 'c-thumb' }, it.thumb ? h('img', { src: it.thumb, alt: '', loading: 'lazy', decoding: 'async' }) : h('span', { class: 'c-ext' }, (it.ext || 'file').slice(0, 4).toUpperCase())),
+    h('span', { class: 'c-name' }, it.title),
+    h('span', { class: 'c-type' }, kindLabel(it)),
+    h('span', { class: 'c-size' }, it.kind === 'link' ? it.meta?.site || '' : bytes(it.size)),
+    h('span', { class: 'c-folder' }, it.folder || '–'),
+    h('span', { class: 'c-date' }, dayDate(it.addedAt)),
+    h('span', { class: 'c-date c-updated' }, dayDate(it.modifiedAt))), it);
+}
+
+/** Index view: just the names. Hovering one shows its picture next to the pointer. */
+function indexRow(it) {
+  const a = opens(h('a', { class: 'irow', href: urlFor({ item: it.id }), 'data-id': it.id },
+    h('span', { class: 'i-name' }, it.title),
+    h('span', { class: 'i-folder' }, it.folder),
+    h('span', { class: 'i-date' }, dayDate(it.addedAt))), it);
+  a.addEventListener('mouseenter', (e) => showPeek(a._item, e));
+  a.addEventListener('mousemove', (e) => (peek.hidden ? showPeek(a._item, e) : movePeek(e))); // back after a scroll
+  a.addEventListener('mouseleave', hidePeek);
+  return a;
+}
+
+const peek = $('#peek');
+function showPeek(it, e) {
+  if (!it?.thumb || !matchMedia('(hover: hover)').matches) return;
+  peek.src = it.thumb;
+  peek.hidden = false;
+  movePeek(e);
+}
+function movePeek(e) {
+  if (peek.hidden) return;
+  const size = 260;
+  const x = e.clientX + 24 + size > innerWidth ? e.clientX - 24 - size : e.clientX + 24;
+  const y = Math.max(8, Math.min(e.clientY - 40, innerHeight - size - 8));
+  peek.style.transform = `translate(${x}px, ${y}px)`;
+}
+function hidePeek() {
+  peek.hidden = true;
+  peek.removeAttribute('src');
+}
+window.addEventListener('scroll', hidePeek, { passive: true });
+
+const itemEl = (it) => (state.view === 'table' ? tableRow(it) : state.view === 'index' ? indexRow(it) : block(it));
 
 function updateBlock(it) {
   const i = state.items.findIndex((x) => x.id === it.id);
   if (i < 0) return false;
   const old = state.items[i];
   state.items[i] = it;
-  const el = grid.querySelector(`.block[data-id="${it.id}"]`);
+  const el = grid.querySelector(`[data-id="${it.id}"]`);
   if (!el) return true;
-  const sameLook = old.thumb === it.thumb && old.excerpt === it.excerpt && old.kind === it.kind && old.title === it.title;
-  if (sameLook) {
-    el._item = it;
-    el.querySelector('.caption').replaceWith(caption(it));
-  } else {
-    el.replaceWith(block(it));
-  }
+  const sameLook = ['thumb', 'excerpt', 'kind', 'title', 'size', 'folder', 'modifiedAt'].every((k) => old[k] === it[k]);
+  if (sameLook) el._item = it;
+  else el.replaceWith(itemEl(it));
   return true;
 }
 
+// New things go on top when the order puts new things first.
+const NEWEST_FIRST = new Set(['', 'relevance', 'new', 'updated']);
+
 function insertBlock(it) {
-  if (updateBlock(it) || !matchesView(it) || state.sort) return;
+  if (updateBlock(it) || !matchesView(it) || !NEWEST_FIRST.has(state.sort)) return;
   state.items.unshift(it);
   state.total++;
-  grid.querySelector('.add-cell')?.after(block(it));
+  grid.querySelector('.add-cell')?.after(itemEl(it));
   $('#empty').hidden = true;
   renderHeading();
   loadFoldersSoon();
@@ -389,7 +474,7 @@ function removeBlock(id) {
     state.items.splice(i, 1);
     state.total = Math.max(0, state.total - 1);
   }
-  grid.querySelector(`.block[data-id="${id}"]`)?.remove();
+  grid.querySelector(`[data-id="${id}"]`)?.remove();
   renderHeading();
   loadFoldersSoon();
 }
@@ -601,14 +686,89 @@ function renderHeading() {
   $('#empty').textContent = state.q || state.tags.length ? 'Nothing found. Try fewer words, or a word in another language.' : 'Nothing here yet. Drop some files, paste a link or write a note.';
 }
 
+// ---------- Type / View / Order menus and Shuffle ----------
+
+/** A word that slides a list of choices open when you hover it (or tap it, on a phone). */
+function menu(name, choices, pick) {
+  const head = h('button', { class: 'menu-head', type: 'button', 'aria-haspopup': 'menu', 'aria-expanded': 'false' }, name);
+  const list = h('div', { class: 'menu-list', role: 'menu', 'aria-label': name },
+    ...choices.map(([value, label]) =>
+      h('button', {
+        type: 'button',
+        role: 'menuitemradio',
+        'data-value': value,
+        onclick: (e) => {
+          e.currentTarget.blur(); // first: leaving focus re-arms the menu (see focusout below)
+          // Close it, even with the pointer still over it, until the pointer leaves.
+          el.classList.remove('open');
+          el.classList.add('shut');
+          head.setAttribute('aria-expanded', 'false');
+          pick(value);
+        },
+      }, label)));
+  const el = h('div', { class: 'menu' }, head, list);
+  head.addEventListener('click', () => {
+    const open = !el.classList.contains('open');
+    for (const m of document.querySelectorAll('.menu.open')) m.classList.remove('open');
+    el.classList.toggle('open', open);
+    el.classList.remove('shut');
+    head.setAttribute('aria-expanded', String(open));
+  });
+  el.addEventListener('mouseleave', () => el.classList.remove('shut'));
+  el.addEventListener('focusout', (e) => !el.contains(e.relatedTarget) && el.classList.remove('shut'));
+  el.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    e.stopPropagation();
+    el.classList.remove('open');
+    el.classList.add('shut');
+    head.focus();
+  });
+  return el;
+}
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.menu')) for (const m of document.querySelectorAll('.menu.open')) m.classList.remove('open');
+});
+
+const menus = {
+  type: menu('Type', TYPES, (kind) => applyFilters({ kind })),
+  view: menu('View', VIEWS, (view) => setView(view)),
+  order: menu('Order', ORDERS, (sort) => applyFilters({ sort })),
+};
+$('#menus').append(menus.type, menus.view, menus.order);
+
+// Relevance only means something while searching; otherwise the default is newest first.
+const currentOrder = () => (state.sort === 'random' ? null : state.sort || (state.q ? 'relevance' : 'new'));
+
+function renderMenus() {
+  const mark = (m, value, set) => {
+    m.classList.toggle('set', set);
+    for (const b of m.querySelectorAll('[role=menuitemradio]')) b.setAttribute('aria-checked', String(b.dataset.value === value));
+  };
+  mark(menus.type, state.kind, Boolean(state.kind));
+  mark(menus.view, state.view, state.view !== 'block');
+  mark(menus.order, currentOrder(), !['', 'random'].includes(state.sort));
+  $('#shuffle').hidden = state.view !== 'block';
+}
+
+function setView(view) {
+  state.view = view;
+  saveView(view);
+  if (view !== 'block' && state.sort === 'random') return applyFilters({ sort: '' }); // Shuffle belongs to the block view
+  history.replaceState(null, '', urlFor({ item: null }));
+  renderFilters();
+  // Same items, drawn the new way: no need to fetch them again.
+  grid.className = `grid view-${view}`;
+  grid.replaceChildren(...(view === 'table' ? [tableHead()] : []), addCellEl, ...state.items.map(itemEl));
+}
+
+// Every press deals the blocks out again in a new random order.
+$('#shuffle').addEventListener('click', () => {
+  state.reveal = true;
+  applyFilters({ sort: 'random' }, { resetSeed: true });
+});
+
 function renderFilters() {
-  const kinds = $('#kinds');
-  kinds.replaceChildren(
-    ...KINDS.map(([key, label]) =>
-      h('button', { type: 'button', 'aria-pressed': String(state.kind === key), onclick: () => applyFilters({ kind: key }) }, label),
-    ),
-  );
-  $('#sort').value = state.sort;
+  renderMenus();
   const active = $('#active-filters');
   const chips = state.tags.map((t) =>
     h('button', { class: 'chip on', type: 'button', title: 'Remove filter', onclick: () => applyFilters({ tags: state.tags.filter((x) => x !== t) }) }, `#${t}`, h('span', { class: 'x' }, '×')),
@@ -683,7 +843,6 @@ $('#q').addEventListener('keydown', (e) => {
     e.target.blur();
   }
 });
-$('#sort').addEventListener('change', (e) => applyFilters({ sort: e.target.value }, { resetSeed: true }));
 $('#brand').addEventListener('click', (e) => {
   e.preventDefault();
   $('#q').value = '';
@@ -735,10 +894,7 @@ function renderStatus(s) {
   btn.onclick = action;
   btn.title = label;
   renderBanner();
-  if (first) {
-    renderHeading();
-    for (const el of grid.querySelectorAll('.block[data-id]')) el.querySelector('.caption').replaceWith(caption(el._item));
-  }
+  if (first) renderHeading();
   renderFolders();
 }
 
@@ -884,6 +1040,13 @@ function fileBig(it, note) {
 
 function renderDetail(it) {
   if (state.editing) return;
+  // Don't redraw under your fingers while you're writing a description (it would take the caret away and break
+  // Korean/Japanese input). Catch up once you're done.
+  const writing = $('.desc', detail);
+  if (writing && writing === document.activeElement && Number(writing.dataset.id) === it.id) {
+    state.deferredDetail = it;
+    return;
+  }
   const i = state.items.findIndex((x) => x.id === it.id);
   const stage = h('div', { class: 'stage' }, stageFor(it),
     i > 0 ? h('button', { class: 'nav prev', type: 'button', 'aria-label': 'Previous', onclick: () => step(-1) }, '‹') : null,
@@ -953,7 +1116,7 @@ function renderDetail(it) {
             applyFilters({ folder: it.folder });
           },
         }, it.folder || 'Top level'))),
-    h('div', { class: 'tags' }, ...tagChips, tagInput),
+    h('div', { class: 'notes' }, descriptionField(it), h('div', { class: 'tags' }, ...tagChips, tagInput)),
     h('section', {}, h('p', { class: 'label' }, 'Info'), h('dl', {}, ...info)),
     h('div', { class: 'actions' }, ...actions),
     h('section', { hidden: true }, h('p', { class: 'label' }, 'Related'), related));
@@ -969,6 +1132,77 @@ function renderDetail(it) {
   if (hadFocus) tagInput.focus();
   loadRelated(it.id, related);
 }
+
+// ---------- description: click, type, and it's saved as you go ----------
+
+const descTyped = new Map(); // id → text typed but not yet confirmed by the server
+const descTimers = new Map();
+const descSaving = new Map(); // id → the save in progress, so saves for one block never overtake each other
+
+function descriptionField(it) {
+  const el = h('textarea', { class: 'desc', rows: 1, placeholder: 'No description', 'aria-label': 'Description', 'data-id': it.id, enterkeyhint: 'done' });
+  el.value = descTyped.has(it.id) ? descTyped.get(it.id) : it.description || '';
+  const fit = () => {
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  };
+  el.addEventListener('input', () => {
+    if (/[\r\n]/.test(el.value)) {
+      const at = el.selectionStart;
+      el.value = el.value.replace(/\r?\n/g, ' '); // one line
+      el.setSelectionRange(at, at);
+    }
+    fit();
+    descTyped.set(it.id, el.value);
+    clearTimeout(descTimers.get(it.id));
+    descTimers.set(it.id, setTimeout(() => saveDescription(it.id), 500));
+  });
+  el.addEventListener('keydown', (e) => {
+    if (e.isComposing || e.keyCode === 229) return; // still composing a Hangul syllable
+    if (e.key === 'Enter' || e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation(); // Esc leaves the field; the next Esc closes the block
+      el.blur();
+    }
+  });
+  el.addEventListener('blur', () => {
+    saveDescription(it.id);
+    // Catch up on anything that arrived while you were typing, once focus has settled somewhere else.
+    setTimeout(() => {
+      const next = state.deferredDetail;
+      state.deferredDetail = null;
+      if (next && state.openId === next.id) renderDetail(next);
+    });
+  });
+  requestAnimationFrame(fit);
+  return el;
+}
+
+function saveDescription(id) {
+  clearTimeout(descTimers.get(id));
+  descTimers.delete(id);
+  const run = (descSaving.get(id) || Promise.resolve())
+    .then(async () => {
+      if (!descTyped.has(id)) return;
+      const description = descTyped.get(id);
+      const it = await api(`/api/items/${id}`, { method: 'PATCH', json: { description } });
+      if (descTyped.get(id) === description) descTyped.delete(id);
+      updateBlock(it);
+    })
+    .catch((err) => toast(`Couldn’t save the description: ${err.message}`, { error: true }));
+  descSaving.set(id, run);
+  run.finally(() => descSaving.get(id) === run && descSaving.delete(id));
+  return run;
+}
+
+const saveDescriptions = () => [...descTyped.keys()].forEach(saveDescription);
+
+// Closing the tab mid-sentence still keeps what you wrote.
+window.addEventListener('pagehide', () => {
+  for (const [id, description] of descTyped) {
+    fetch(`/api/items/${id}`, { method: 'PATCH', keepalive: true, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ description }) });
+  }
+});
 
 async function loadRelated(id, el) {
   try {
