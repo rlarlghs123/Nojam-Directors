@@ -154,7 +154,8 @@ to stay awake when the display is off.
 - **Memos** are Markdown files. Open one and press **Edit** to change it; it's re-tagged after you save.
 - **Search:** click the magnifier next to the title. Any part of any word, any language. Combine words (`red poster`),
   use `#tag` for an exact tag, and narrow down with folders (channels).
-- **Type, View, Order:** hover one of the three words above the grid (or tap it on a phone).
+- **Type, View, Order:** point at one of the three words above the grid (or tap it on a phone) and its choices
+  slide open in a line underneath.
   **Type** shows only images, videos, text, PDFs, links or everything else. **View** switches between blocks, a table
   and an index of names (hover a name to see its picture). **Order**: relevance (when searching), recently updated,
   newest, oldest or alphabetical.

@@ -686,67 +686,113 @@ function renderHeading() {
   $('#empty').textContent = state.q || state.tags.length ? 'Nothing found. Try fewer words, or a word in another language.' : 'Nothing here yet. Drop some files, paste a link or write a note.';
 }
 
-// ---------- Type / View / Order menus and Shuffle ----------
+// ---------- Type / View / Order and Shuffle ----------
 
-/** A word that slides a list of choices open when you hover it (or tap it, on a phone). */
-function menu(name, choices, pick) {
-  const head = h('button', { class: 'menu-head', type: 'button', 'aria-haspopup': 'menu', 'aria-expanded': 'false' }, name);
-  const list = h('div', { class: 'menu-list', role: 'menu', 'aria-label': name },
-    ...choices.map(([value, label]) =>
-      h('button', {
-        type: 'button',
-        role: 'menuitemradio',
-        'data-value': value,
-        onclick: (e) => {
-          e.currentTarget.blur(); // first: leaving focus re-arms the menu (see focusout below)
-          // Close it, even with the pointer still over it, until the pointer leaves.
-          el.classList.remove('open');
-          el.classList.add('shut');
-          head.setAttribute('aria-expanded', 'false');
-          pick(value);
-        },
-      }, label)));
-  const el = h('div', { class: 'menu' }, head, list);
-  head.addEventListener('click', () => {
-    const open = !el.classList.contains('open');
-    for (const m of document.querySelectorAll('.menu.open')) m.classList.remove('open');
-    el.classList.toggle('open', open);
-    el.classList.remove('shut');
-    head.setAttribute('aria-expanded', String(open));
-  });
-  el.addEventListener('mouseleave', () => el.classList.remove('shut'));
-  el.addEventListener('focusout', (e) => !el.contains(e.relatedTarget) && el.classList.remove('shut'));
-  el.addEventListener('keydown', (e) => {
-    if (e.key !== 'Escape') return;
-    e.stopPropagation();
-    el.classList.remove('open');
-    el.classList.add('shut');
-    head.focus();
-  });
-  return el;
-}
-document.addEventListener('click', (e) => {
-  if (!e.target.closest('.menu')) for (const m of document.querySelectorAll('.menu.open')) m.classList.remove('open');
-});
-
-const menus = {
-  type: menu('Type', TYPES, (kind) => applyFilters({ kind })),
-  view: menu('View', VIEWS, (view) => setView(view)),
-  order: menu('Order', ORDERS, (sort) => applyFilters({ sort })),
+// Point at Type, View or Order and its choices slide open in a line underneath, pushing the blocks down.
+// On a phone, tap the word instead.
+const MENUS = {
+  type: { label: 'Type', choices: TYPES, pick: (kind) => applyFilters({ kind }), current: () => state.kind, set: () => Boolean(state.kind) },
+  view: { label: 'View', choices: VIEWS, pick: (view) => setView(view), current: () => state.view, set: () => state.view !== 'block' },
+  order: { label: 'Order', choices: ORDERS, pick: (sort) => applyFilters({ sort }), current: () => currentOrder(), set: () => !['', 'random'].includes(state.sort) },
 };
-$('#menus').append(menus.type, menus.view, menus.order);
-
 // Relevance only means something while searching; otherwise the default is newest first.
 const currentOrder = () => (state.sort === 'random' ? null : state.sort || (state.q ? 'relevance' : 'new'));
 
+const filtersEl = $('#filters');
+const strip = $('#menu-strip');
+const stripOpts = $('#menu-opts');
+const canHover = () => matchMedia('(hover: hover)').matches;
+let openMenu = null;
+let closeTimer;
+let quietFocus = false; // focusing a word from code (after Esc) shouldn't open it again
+
+for (const [key, m] of Object.entries(MENUS)) {
+  const head = h('button', { class: 'menu-head', type: 'button', 'data-menu': key, 'aria-expanded': 'false', 'aria-controls': 'menu-strip' }, m.label);
+  head.addEventListener('mouseenter', () => canHover() && showMenu(key));
+  head.addEventListener('click', () => (openMenu === key && !canHover() ? hideMenu() : showMenu(key)));
+  head.addEventListener('focus', () => {
+    if (!quietFocus && head.matches(':focus-visible')) showMenu(key);
+    quietFocus = false;
+  });
+  head.addEventListener('keydown', (e) => {
+    if (['Enter', ' ', 'ArrowDown'].includes(e.key)) {
+      e.preventDefault();
+      showMenu(key);
+      (stripOpts.querySelector('[aria-pressed="true"]') || stripOpts.firstElementChild)?.focus();
+    } else if (e.key === 'Escape') {
+      e.stopPropagation();
+      hideMenu();
+    }
+  });
+  $('#menus').append(head);
+}
+
+function showMenu(key) {
+  clearTimeout(closeTimer);
+  const switching = openMenu && openMenu !== key && strip.classList.contains('open');
+  if (openMenu !== key) {
+    openMenu = key;
+    const m = MENUS[key];
+    stripOpts.setAttribute('aria-label', m.label);
+    stripOpts.replaceChildren(...m.choices.map(([value, label]) =>
+      h('button', {
+        type: 'button',
+        'data-value': value,
+        onclick: () => {
+          m.pick(value);
+          if (!canHover()) hideMenu();
+        },
+      }, label)));
+    if (switching) stripOpts.animate([{ opacity: 0, transform: 'translateY(-4px)' }, { opacity: 1, transform: 'none' }], { duration: 180, easing: 'ease-out' });
+  }
+  strip.inert = false;
+  strip.classList.add('open');
+  renderMenus();
+}
+
+function hideMenu() {
+  clearTimeout(closeTimer);
+  openMenu = null;
+  strip.classList.remove('open');
+  strip.inert = true;
+  renderMenus();
+}
+
+filtersEl.addEventListener('mouseenter', () => clearTimeout(closeTimer));
+filtersEl.addEventListener('mouseleave', () => {
+  if (canHover() && openMenu) closeTimer = setTimeout(hideMenu, 250);
+});
+filtersEl.addEventListener('focusout', (e) => {
+  if (openMenu && !filtersEl.contains(e.relatedTarget) && !filtersEl.matches(':hover')) hideMenu();
+});
+document.addEventListener('click', (e) => {
+  if (openMenu && !filtersEl.contains(e.target)) hideMenu();
+});
+stripOpts.addEventListener('keydown', (e) => {
+  const opts = [...stripOpts.children];
+  const i = opts.indexOf(document.activeElement);
+  if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+    e.preventDefault();
+    opts[(i + (e.key === 'ArrowRight' ? 1 : -1) + opts.length) % opts.length].focus();
+  } else if (e.key === 'Escape' || e.key === 'ArrowUp') {
+    e.preventDefault();
+    e.stopPropagation();
+    const key = openMenu;
+    hideMenu();
+    quietFocus = true;
+    document.querySelector(`.menu-head[data-menu="${key}"]`)?.focus();
+  }
+});
+
 function renderMenus() {
-  const mark = (m, value, set) => {
-    m.classList.toggle('set', set);
-    for (const b of m.querySelectorAll('[role=menuitemradio]')) b.setAttribute('aria-checked', String(b.dataset.value === value));
-  };
-  mark(menus.type, state.kind, Boolean(state.kind));
-  mark(menus.view, state.view, state.view !== 'block');
-  mark(menus.order, currentOrder(), !['', 'random'].includes(state.sort));
+  for (const b of document.querySelectorAll('.menu-head')) {
+    b.classList.toggle('set', MENUS[b.dataset.menu].set());
+    b.setAttribute('aria-expanded', String(b.dataset.menu === openMenu));
+  }
+  if (openMenu) {
+    const current = MENUS[openMenu].current();
+    for (const o of stripOpts.children) o.setAttribute('aria-pressed', String(o.dataset.value === current));
+  }
   $('#shuffle').hidden = state.view !== 'block';
 }
 

@@ -31,9 +31,14 @@
 
     <nav class="folders" id="folders" aria-label="Folders"></nav>
 
-    <div class="filters">
-      <div class="menus" id="menus"></div>
-      <button id="shuffle" class="shuffle" type="button">Shuffle</button>
+    <div class="filters" id="filters">
+      <div class="filters-row">
+        <div class="menus" id="menus"></div>
+        <button id="shuffle" class="shuffle" type="button">Shuffle</button>
+      </div>
+      <div class="menu-strip" id="menu-strip" inert>
+        <div><div class="menu-opts" id="menu-opts" role="group"></div></div>
+      </div>
     </div>
 
     <div class="active-filters" id="active-filters"></div>
