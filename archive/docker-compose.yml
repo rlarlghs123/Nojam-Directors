@@ -1,0 +1,22 @@
+# docker compose up -d   →   http://<server>:3000
+services:
+  archive:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    env_file:
+      - path: .env        # ANTHROPIC_API_KEY, ARCHIVE_PASSWORD, … (copy .env.example)
+        required: false
+    environment:
+      HOST: 0.0.0.0
+      ARCHIVE_DIR: /library
+      DATA_DIR: /data
+    volumes:
+      # Your files. Point this at the synced folder on the server,
+      # e.g. /volume1/homes/you/Drive/Archive on a Synology running Synology Drive or Cloud Sync.
+      - ./library:/library
+      # Search index + thumbnails (local, not synced).
+      - ./data:/data
+    # Uncomment to write files as your user instead of root (check the ids with `id`):
+    # user: "1000:1000"

@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Archive</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='4' y='4' width='24' height='24' fill='%23111'/%3E%3Crect x='10' y='10' width='12' height='12' fill='%23fff'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/style.css">
+  <meta name="color-scheme" content="light dark">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" id="brand"><span class="mark" aria-hidden="true"></span><span id="brand-title">Archive</span></a>
+    <label class="search">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12.6 12.6 17 17" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      <input id="q" type="search" placeholder="Search images, memos, videos, links…" autocomplete="off" spellcheck="false" aria-label="Search">
+      <kbd>/</kbd>
+    </label>
+    <div class="top-actions">
+      <button id="status" class="status" type="button" hidden></button>
+      <button id="add-btn" class="btn" type="button">Add</button>
+    </div>
+  </header>
+
+  <div id="banner" class="banner" hidden></div>
+
+  <main>
+    <section class="channel-head">
+      <h1 id="heading">All blocks</h1>
+      <p id="subheading" class="muted"></p>
+    </section>
+
+    <nav class="folders" id="folders" aria-label="Folders"></nav>
+
+    <div class="filters">
+      <div class="kinds" id="kinds" role="group" aria-label="Type"></div>
+      <label class="sort muted">Sort
+        <select id="sort">
+          <option value="">Newest</option>
+          <option value="old">Oldest</option>
+          <option value="random">Shuffle</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="active-filters" id="active-filters"></div>
+    <div class="tag-strip" id="tag-strip" aria-label="Popular tags"></div>
+
+    <div class="grid" id="grid"></div>
+    <div id="sentinel" aria-hidden="true"></div>
+    <p id="empty" class="empty muted" hidden></p>
+  </main>
+
+  <div id="detail" class="detail" hidden role="dialog" aria-modal="true" aria-label="Block"></div>
+  <div id="dropzone" class="dropzone" hidden><div id="dropzone-label">Drop to add</div></div>
+  <div id="toasts" class="toasts" aria-live="polite"></div>
+  <input id="file-input" type="file" multiple hidden>
+
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
