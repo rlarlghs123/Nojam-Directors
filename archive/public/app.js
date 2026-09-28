@@ -731,6 +731,11 @@ function renderStatus(s) {
     cls = 'warn';
     label = `${t.queued.toLocaleString()} waiting for tags`;
     action = () => { bannerDismissed = false; renderBanner(); };
+  } else if (t.enabled && t.retryAt && t.lastError) {
+    // e.g. Ollama isn't running yet, or a free daily limit is used up: it retries by itself.
+    cls = 'warn';
+    label = 'Tagging is waiting';
+    action = () => { bannerDismissed = false; renderBanner(); };
   } else if (t.enabled && (t.active || t.queued)) {
     cls = 'busy';
     label = `Tagging ${(t.active + t.queued).toLocaleString()}…`;
@@ -766,6 +771,13 @@ function renderBanner() {
   if (!t || bannerDismissed) content = null;
   else if (t.enabled && t.paused && t.lastError) {
     content = [h('p', {}, t.lastError), h('div', { class: 'actions' }, h('button', { class: 'btn small', type: 'button', onclick: () => post('resume') }, 'Resume tagging'))];
+  } else if (t.enabled && t.retryAt && t.lastError) {
+    content = [
+      h('p', {}, t.provider === 'ollama' ? `${t.lastError} ${t.setupHint}` : t.lastError),
+      h('div', { class: 'actions' },
+        h('button', { class: 'btn small', type: 'button', onclick: () => post('resume') }, 'Try now'),
+        h('button', { class: 'btn small ghost', type: 'button', onclick: () => { bannerDismissed = true; renderBanner(); } }, 'Hide')),
+    ];
   } else if (t.enabled && t.needsApproval) {
     const cost = t.estimate != null ? ` (roughly ${money(t.estimate)} with ${t.model})` : '';
     content = [

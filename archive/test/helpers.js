@@ -62,6 +62,7 @@ export async function testApp({ client = fakeClaude(), config = {}, listen = fal
     rescanMinutes: 0,
     confirmBacklog: 1000,
     password: '',
+    tagger: 'claude', // most tests use the Claude stand-in; provider tests override this
     model: 'claude-opus-5',
     autoTag: true,
     languages: ['en'],

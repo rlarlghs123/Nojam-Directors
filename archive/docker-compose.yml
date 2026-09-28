@@ -1,4 +1,6 @@
 # docker compose up -d   →   http://<server>:3000
+# First time only, download the free tagging model:
+#   docker compose exec ollama ollama pull qwen3-vl:8b-instruct
 services:
   archive:
     build: .
@@ -6,21 +8,36 @@ services:
     ports:
       - "3000:3000"
     env_file:
-      - path: .env        # ANTHROPIC_API_KEY, ARCHIVE_PASSWORD, … (copy .env.example)
+      - path: .env        # ARCHIVE_PASSWORD, TAGGER, … (copy .env.example)
         required: false
     environment:
       HOST: 0.0.0.0
       ARCHIVE_DIR: /library
       DATA_DIR: /data
+      OLLAMA_HOST: http://ollama:11434   # the free tagger below
     volumes:
       # Your files. Point this at the synced folder on the server,
       # e.g. /volume1/homes/you/Drive/Archive on a Synology running Synology Drive or Cloud Sync.
       - ./library:/library
       # Search index + thumbnails (local, not synced).
       - ./data:/data
+    depends_on:
+      - ollama
     # Uncomment to write files as your user instead of root (check the ids with `id`):
     # user: "1000:1000"
-    # Free tagging with Ollama running on this machine: set TAGGER=ollama and
-    # TAG_API_URL=http://host.docker.internal:11434 in .env, and uncomment:
-    # extra_hosts:
-    #   - "host.docker.internal:host-gateway"
+
+  # The free tagger (TAGGER=ollama, the default). On a CPU it takes a while per block; that's fine in the background.
+  # Using Claude, Gemini or OpenRouter instead? Delete this service and the depends_on above.
+  ollama:
+    image: ollama/ollama
+    restart: unless-stopped
+    volumes:
+      - ./ollama:/root/.ollama   # downloaded models
+    # With an NVIDIA GPU, uncomment for much faster tagging:
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]

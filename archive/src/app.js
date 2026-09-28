@@ -138,7 +138,7 @@ export async function createApp(config, { client } = {}) {
 
   app.post('/api/items/:id/retag', (req, res) => {
     const { id } = itemOr404(req);
-    if (!tagger.enabled) throw httpError(409, tagger.status().setupHint || 'Auto-tagging is turned off (AUTO_TAG=off)');
+    if (!tagger.enabled) throw httpError(409, config.autoTag ? tagger.status().setupHint : 'Auto-tagging is turned off (AUTO_TAG=off)');
     tagger.retag(id);
     res.json({ ok: true });
   });

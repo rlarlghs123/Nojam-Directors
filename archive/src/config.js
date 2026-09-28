@@ -32,8 +32,8 @@ export function loadConfig(overrides = {}) {
     port: num(env.PORT, 3000),
     password: env.ARCHIVE_PASSWORD || '',
     title: env.ARCHIVE_TITLE || 'Archive',
-    // Who writes the tags: claude | ollama | gemini | openrouter | custom (see providers.js).
-    tagger: (env.TAGGER || 'claude').trim().toLowerCase(),
+    // Who writes the tags: ollama (free, on this computer) | claude | gemini | openrouter | custom (see providers.js).
+    tagger: (env.TAGGER || 'ollama').trim().toLowerCase(),
     tagModel: env.TAG_MODEL || '', // empty = the provider's default model
     tagUrl: env.TAG_API_URL || '',
     tagKey: env.TAG_API_KEY || '',

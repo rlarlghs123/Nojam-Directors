@@ -4,3 +4,4 @@ data/
 library/
 *.log
 .DS_Store
+ollama/

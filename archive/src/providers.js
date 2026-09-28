@@ -4,8 +4,8 @@ import path from 'node:path';
 import Anthropic from '@anthropic-ai/sdk';
 
 // Who writes the tags. Pick one with TAGGER= in archive/.env:
+//   ollama      a vision model running on this computer (free, private, no limits) — the default
 //   claude      Anthropic Claude (paid, best quality)
-//   ollama      a vision model running on this computer (free, private, no limits)
 //   gemini      Google Gemini API free tier (free with daily limits)
 //   openrouter  OpenRouter's free models (free with daily limits)
 //   custom      any OpenAI-compatible endpoint (LM Studio, Groq, a paid API…)
@@ -123,7 +123,7 @@ function ollamaProvider(config) {
     free: true,
     configured: true,
     concurrency: 1,
-    setupHint: `Install Ollama from ollama.com, then run: ollama pull ${model}`,
+    setupHint: `To tag for free, install Ollama from ollama.com, keep it running, and run: ollama pull ${model}`,
     async complete({ system, image, text, schema }) {
       let res;
       try {
@@ -259,7 +259,7 @@ function openAIProvider(config, preset) {
 
 /** `client` lets tests pass a stand-in for the Anthropic SDK. */
 export function createProvider(config, { client } = {}) {
-  const name = (config.tagger || 'claude').toLowerCase();
+  const name = (config.tagger || 'ollama').toLowerCase();
   if (name === 'claude' || name === 'anthropic') return claudeProvider(config, client);
   if (name === 'ollama') return ollamaProvider(config);
   if (PRESETS[name]) return openAIProvider(config, name);

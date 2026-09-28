@@ -163,11 +163,15 @@ export class Tagger {
     this.approve();
   }
 
+  /** "Tag them all" / "Resume" / "Try now": clear every hold, including a back-off wait. */
   approve() {
     this.approved = true;
     this.needsApproval = false;
     this.paused = false;
     this.lastError = null;
+    this.blockedUntil = 0;
+    this.busyStreak = 0;
+    clearTimeout(this.retryTimer);
     this.pump();
   }
 
@@ -196,10 +200,11 @@ export class Tagger {
       label: p.label,
       model: p.model,
       free: p.free,
-      setupHint: p.configured ? null : p.setupHint,
+      setupHint: p.setupHint,
       queued,
       active: this.active,
       paused: this.paused,
+      retryAt: this.blockedUntil > Date.now() ? this.blockedUntil : null, // waiting after "busy" or "unreachable"
       needsApproval: this.needsApproval,
       estimate: p.free ? 0 : estimateCost(queued, p.model),
       lastError: this.lastError,

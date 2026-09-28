@@ -2,7 +2,7 @@
 
 A private, [are.na](https://www.are.na)-style archive for design references: images, memos, videos, PDFs and links.
 Everything lives as ordinary files in **one folder in your own cloud drive**, and **an AI tags every new block for you**
-(Claude, or a [free model on your own computer](#auto-tagging-claude-or-free)), so you can search for “red swiss poster”
+(by default a [free model running on your own computer](#auto-tagging), or Claude), so you can search for “red swiss poster”
 or “fog long take” without typing tags by hand.
 
 ![The archive grid](docs/grid.jpg)
@@ -17,7 +17,7 @@ or “fog long take” without typing tags by hand.
   and everything the AI wrote about each block. `#tag` filters by an exact tag.
 - **Automatic tags.** For every new block the AI writes a title, 6–12 tags, a one-line summary and hidden search keywords
   (optionally with translations, so English tags can be found in Korean too). You can add or remove tags; your edits always win.
-  Use Claude, or tag for free with a model running on your own computer.
+  By default this runs for free on your own computer with [Ollama](https://ollama.com); Claude is an option for the most precise tags.
 
 <p align="center"><img src="docs/detail.jpg" alt="A block with its tags" width="49%"> <img src="docs/mobile.jpg" alt="On a phone" width="24%"></p>
 
@@ -25,26 +25,26 @@ or “fog long take” without typing tags by hand.
 
 ## Quick start
 
-1. Install **Node.js 22 or newer** from [nodejs.org](https://nodejs.org).
+1. Install **Node.js 22 or newer** from [nodejs.org](https://nodejs.org), and **[Ollama](https://ollama.com)** for the free tags
+   (on a Mac: download the app, or `brew install ollama`). Keep Ollama running.
 2. In a terminal:
    ```sh
+   ollama pull qwen3-vl:8b-instruct     # the tagging model, once (on a Mac with 8 GB of memory: qwen3-vl:4b-instruct)
    cd archive
    npm install
    cp .env.example .env
    ```
-3. Open `.env` and set two things:
-   - `ARCHIVE_DIR`: the folder that holds your references (see [where to keep your files](#where-to-keep-your-files)).
-   - Who writes the tags: `ANTHROPIC_API_KEY` from [console.anthropic.com](https://console.anthropic.com/) for Claude,
-     or `TAGGER=ollama` for free tagging on your own computer (see [auto-tagging](#auto-tagging-claude-or-free)).
-     Everything else works without tags too.
+3. Open `.env` and set `ARCHIVE_DIR`: the folder that holds your references
+   (see [where to keep your files](#where-to-keep-your-files)). If you pulled the smaller model, also set `TAG_MODEL=qwen3-vl:4b-instruct`.
 4. Start it:
    ```sh
    npm start
    ```
    and open **http://localhost:3000**.
 
-The first time, it reads the whole folder and makes thumbnails. With Claude, if more than 50 blocks are waiting for tags,
-it asks before sending them and shows a rough cost. (The free options just start.)
+The first time, it reads the whole folder and makes thumbnails, then tags everything in the background. On an Apple-silicon
+Mac that's a few seconds per block, so a big first import can run overnight. If Ollama isn't running, the archive shows
+**Tagging is waiting** and carries on once it is; everything except the tags works in the meantime.
 
 Optional, for more previews:
 - **ffmpeg** (video thumbnails): a copy is bundled on most computers; if videos show no picture, install it with `brew install ffmpeg` (Mac) or `winget install ffmpeg` (Windows).
@@ -86,13 +86,14 @@ On a Synology/QNAP/Unraid box, a Raspberry Pi or any Linux machine:
 
 ```sh
 cd archive
-cp .env.example .env          # add ARCHIVE_PASSWORD, and ANTHROPIC_API_KEY or a free TAGGER
+cp .env.example .env          # set ARCHIVE_PASSWORD
 # edit docker-compose.yml: point the /library volume at your folder
 docker compose up -d
+docker compose exec ollama ollama pull qwen3-vl:8b-instruct   # the free tagging model, once
 ```
 
-To tag for free with Ollama running on the same machine, set `TAGGER=ollama` and
-`TAG_API_URL=http://host.docker.internal:11434`, and uncomment the `extra_hosts` line in `docker-compose.yml`.
+The compose file runs Ollama next to the archive. Without a graphics card each block takes a while to tag, which is fine in
+the background. If you use Claude, Gemini or OpenRouter instead, delete the `ollama` service from `docker-compose.yml`.
 
 Keep the folder in sync with your devices using whatever the NAS offers (Synology Drive, Nextcloud, Syncthing,
 or Synology Cloud Sync to Google Drive).
@@ -154,37 +155,40 @@ to stay awake when the display is off.
 - **Keyboard:** `/` or ⌘K to search, ← → to move between blocks, Esc to close.
 - **Delete** moves the file to a `.trash` folder inside your library, so you can always get it back.
 
-## Auto-tagging: Claude or free
+## Auto-tagging
 
-Pick who writes the tags with `TAGGER=` in `.env`. You can switch any time: existing tags stay, new blocks use the new
-tagger, and **Re-tag** redoes a single block.
+Pick who writes the tags with `TAGGER=` in `.env`; the default is `ollama`. You can switch any time: existing tags stay,
+new blocks use the new tagger, and **Re-tag** redoes a single block.
 
 | `TAGGER` | Cost | Limits | Where your files go |
 | --- | --- | --- | --- |
-| `claude` (default) | about $0.03 per block with `claude-opus-5`, about half a cent with `TAG_MODEL=claude-haiku-4-5` | none | a small copy is sent to Anthropic's API |
-| **`ollama`** | **free** | none; a few seconds per block on an Apple-silicon Mac | **nowhere, it runs on your computer** |
+| **`ollama`** (default) | **free** | none; a few seconds per block on an Apple-silicon Mac | **nowhere, it runs on your computer** |
+| `claude` | about $0.03 per block with `claude-opus-5`, about half a cent with `TAG_MODEL=claude-haiku-4-5` | none | a small copy is sent to Anthropic's API |
 | `gemini` | free tier | a few hundred to about 1,500 blocks a day, changed by Google without notice; not offered in the EU, UK or Switzerland | Google may use free-tier content to improve its products (people may review it) |
 | `openrouter` | free models | 50 requests a day (1,000 a day after a one-time $10 top-up); the free models rotate | depends on the model's host |
 | `custom` | depends | depends | any OpenAI-compatible API, e.g. [LM Studio](https://lmstudio.ai) (free, local) |
 
-Claude gives the most precise tags, especially for names, typefaces and styles. For a free archive, **Ollama is the one to use**:
-no account, no limits, nothing leaves your computer.
+Ollama costs nothing, needs no account, has no limits, and nothing leaves your computer. Claude gives the most precise tags,
+especially for names, typefaces and styles.
 
-### Free, on your own computer: Ollama
+### Free, on your own computer: Ollama (the default)
 
 1. Install [Ollama](https://ollama.com) (on a Mac: download the app, or `brew install ollama`) and keep it running.
 2. Download a model that can see images:
    ```sh
-   ollama pull qwen3-vl:8b-instruct     # needs about 8–9 GB of free memory; good at reading text in posters
+   ollama pull qwen3-vl:8b-instruct     # the default; needs about 8–9 GB of free memory; good at reading text in posters
    ollama pull qwen3-vl:4b-instruct     # for Macs with 8 GB of memory (about 3.5 GB)
    ollama pull gemma4:e4b               # another good choice, strong in Korean and other languages
    ```
-3. In `.env`:
-   ```sh
-   TAGGER=ollama
-   TAG_MODEL=qwen3-vl:8b-instruct       # or the one you downloaded
-   ```
-4. Restart the archive. A big first import can take a while, so leave it running overnight.
+3. If you chose a model other than the default, name it in `.env`, e.g. `TAG_MODEL=qwen3-vl:4b-instruct`.
+4. Start (or restart) the archive. A big first import can take a while, so leave it running overnight.
+
+Ollama on another computer (say a desktop with a strong graphics card)? Set `TAG_API_URL=http://that-computer:11434`.
+
+### Paid, most precise: Claude
+
+In `.env`: `TAGGER=claude` and `ANTHROPIC_API_KEY=` with a key from [console.anthropic.com](https://console.anthropic.com/).
+If more than 50 blocks are waiting (`TAG_CONFIRM_OVER`), the archive asks before tagging them and shows a rough cost.
 
 ### Free in the cloud: Gemini
 
@@ -246,9 +250,9 @@ All settings go in `archive/.env` (see `.env.example`). Real environment variabl
 | --- | --- | --- |
 | `ARCHIVE_DIR` | `./library` | The folder with your files. |
 | `DATA_DIR` | `./data` | Search index and thumbnails. Keep it out of the synced folder. |
-| `TAGGER` | `claude` | Who writes the tags: `claude`, `ollama`, `gemini`, `openrouter` or `custom`. |
-| `ANTHROPIC_API_KEY` | | Claude's API key. |
-| `TAG_MODEL` | per tagger | `claude-opus-5`, `qwen3-vl:8b-instruct`, `gemini-3.5-flash-lite`, `openrouter/free`. (`CLAUDE_MODEL` still works too.) |
+| `TAGGER` | `ollama` | Who writes the tags: `ollama`, `claude`, `gemini`, `openrouter` or `custom`. |
+| `ANTHROPIC_API_KEY` | | Claude's API key (for `TAGGER=claude`). |
+| `TAG_MODEL` | per tagger | `qwen3-vl:8b-instruct`, `claude-opus-5`, `gemini-3.5-flash-lite`, `openrouter/free`. (`CLAUDE_MODEL` still works too.) |
 | `TAG_API_KEY` | | Key for `gemini`, `openrouter` or `custom`. |
 | `TAG_API_URL` | | Another address for the tagger, e.g. Ollama on a different computer, or a `custom` API. |
 | `ARCHIVE_LANGUAGES` | `en` | Tag language, then extra languages for hidden search keywords, e.g. `en,ko`. |

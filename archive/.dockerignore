@@ -6,3 +6,4 @@ test
 docs
 *.log
 .DS_Store
+ollama

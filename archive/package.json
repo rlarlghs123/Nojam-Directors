@@ -2,7 +2,7 @@
   "name": "nojam-archive",
   "version": "0.1.0",
   "private": true,
-  "description": "A self-hosted, are.na-style archive for design references, memos, videos and links, auto-tagged by Claude.",
+  "description": "A self-hosted, are.na-style archive for design references, memos, videos and links, with automatic tags.",
   "type": "module",
   "engines": {
     "node": ">=22.13"

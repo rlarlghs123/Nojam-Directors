@@ -102,11 +102,38 @@ describe('Ollama (free, on this computer)', () => {
       await addFiles(t, { 'x.txt': 'x' });
       t.tagger.start();
       await waitFor(() => t.tagger.status().lastError);
-      assert.match(t.tagger.status().lastError, /Can't reach Ollama/);
-      assert.ok(t.tagger.blockedUntil > Date.now() + 30_000);
+      const s = t.tagger.status();
+      assert.match(s.lastError, /Can't reach Ollama/);
+      assert.ok(s.retryAt > Date.now() + 30_000); // the page shows "Tagging is waiting"
+      assert.match(s.setupHint, /ollama pull qwen3-vl:8b-instruct/);
       assert.equal(t.store.getByPath('x.txt').tag_status, 'pending');
     } finally {
       await t.close();
+    }
+  });
+
+  test('"Try now" skips the wait', async () => {
+    mode = 'ok';
+    let down = true;
+    const flaky = await fakeServer((req, body) => {
+      if (down) return [503, { error: 'server busy, please try again' }];
+      const name = body.messages[1].content.match(/File name: (.*)/)[1];
+      return [200, { model: body.model, message: { role: 'assistant', content: JSON.stringify(answer(name)) }, done: true }];
+    });
+    const t = await testApp({ client: null, config: { tagger: 'ollama', tagUrl: flaky.url } });
+    try {
+      await addFiles(t, { 'x.txt': 'x' });
+      t.tagger.start();
+      await waitFor(() => t.tagger.status().retryAt);
+      assert.equal(flaky.requests.length, 1);
+      down = false;
+      t.tagger.approve(); // what the "Try now" button does
+      await waitFor(() => t.store.getByPath('x.txt').tag_status === 'done');
+      assert.equal(t.tagger.status().retryAt, null);
+      assert.equal(flaky.requests.length, 2);
+    } finally {
+      await t.close();
+      flaky.close();
     }
   });
 });
