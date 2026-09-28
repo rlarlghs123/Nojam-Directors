@@ -10,11 +10,10 @@
 </head>
 <body>
   <header class="topbar">
-    <a class="brand" href="/" id="brand"><span class="mark" aria-hidden="true"></span><span id="brand-title">Archive</span></a>
-    <label class="search">
+    <a class="brand" href="/" id="brand"><span id="brand-title">Archive</span></a>
+    <label class="search" title="Search (/)">
       <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12.6 12.6 17 17" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
-      <input id="q" type="search" placeholder="Search images, memos, videos, links…" autocomplete="off" spellcheck="false" aria-label="Search">
-      <kbd>/</kbd>
+      <input id="q" type="search" placeholder="Search" autocomplete="off" spellcheck="false" aria-label="Search">
     </label>
     <div class="top-actions">
       <button id="status" class="status" type="button" hidden></button>
@@ -44,7 +43,6 @@
     </div>
 
     <div class="active-filters" id="active-filters"></div>
-    <div class="tag-strip" id="tag-strip" aria-label="Popular tags"></div>
 
     <div class="grid" id="grid"></div>
     <div id="sentinel" aria-hidden="true"></div>

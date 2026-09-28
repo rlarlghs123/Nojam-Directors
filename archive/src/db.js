@@ -230,7 +230,7 @@ export class Store {
       .map((r) => r.tag);
   }
 
-  /** Tag counts among the items matching the given search/filters (what the tag strip shows). */
+  /** Tag counts among the items matching the given search/filters. */
   tagCounts({ q = '', tags = [], folder = '', kinds = [], limit = 60 } = {}) {
     const f = this.#filter({ q, tags, folder, kinds });
     const sql = `SELECT tag, COUNT(*) AS n FROM tags

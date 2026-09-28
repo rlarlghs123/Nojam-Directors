@@ -221,7 +221,7 @@ async function load({ reset = false } = {}) {
     state.total = 0;
     state.done = false;
     addCellEl ||= addCell();
-    $('.head', addCellEl).textContent = `+ Add block${state.folder ? ` to ${state.folder.split('/').pop()}` : ''}`;
+    addCellEl.title = state.folder ? `Add to ${state.folder.split('/').pop()}` : '';
     grid.replaceChildren(addCellEl);
     renderHeading();
   }
@@ -258,7 +258,6 @@ function applyFilters(over, { resetSeed = false } = {}) {
   history.replaceState(null, '', urlFor({ item: null }));
   renderFilters();
   load({ reset: true });
-  loadTags();
 }
 
 // ---------- blocks ----------
@@ -341,9 +340,8 @@ function facts(it) {
 }
 
 function caption(it) {
-  const pending = state.status?.tagging?.enabled && (it.tagStatus === 'pending' || it.tagStatus === 'tagging');
   return h('div', { class: 'caption' },
-    h('div', { class: 't' }, pending ? h('span', { class: 'tagging-dot', title: 'Being tagged' }) : null, it.title),
+    h('div', { class: 't' }, it.title),
     h('div', { class: 's' }, `${facts(it)} · ${shortDate(it.addedAt)}`));
 }
 
@@ -398,10 +396,22 @@ function removeBlock(id) {
 
 // ---------- the "add block" cell ----------
 
+// At rest it's just a "+". Click it to write a note, or paste a link, an image or files into it.
 function addCell() {
-  addText = h('textarea', { placeholder: 'Write a note or paste a link…', 'aria-label': 'New note or link' });
+  addText = h('textarea', { 'aria-label': 'Write a note or paste a link' });
   const addBtn = h('button', { class: 'btn small', type: 'button', disabled: true }, 'Add');
-  addText.addEventListener('input', () => (addBtn.disabled = !addText.value.trim()));
+  const keepOpen = (e) => e.preventDefault(); // clicking these mustn't take the focus away and close the cell
+  const cell = h('div', { class: 'block add-cell' },
+    h('div', { class: 'frame' },
+      h('span', { class: 'plus', 'aria-hidden': 'true' }), // drawn in CSS
+      addText,
+      h('div', { class: 'row' },
+        h('button', { class: 'linkish', type: 'button', onmousedown: keepOpen, onclick: () => fileInput.click() }, 'Choose files'),
+        addBtn)));
+  addText.addEventListener('input', () => {
+    addBtn.disabled = !addText.value.trim();
+    cell.classList.toggle('filled', addText.value !== '');
+  });
   addText.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
       e.preventDefault();
@@ -415,13 +425,9 @@ function addCell() {
       uploadFiles(files);
     }
   });
+  addBtn.addEventListener('mousedown', keepOpen);
   addBtn.addEventListener('click', () => submitText(addText.value));
-  return h('div', { class: 'block add-cell' },
-    h('div', { class: 'frame' },
-      h('div', { class: 'head' }, '+ Add block'),
-      addText,
-      h('div', { class: 'row' }, h('button', { class: 'linkish', type: 'button', onclick: () => fileInput.click() }, 'or choose files'), addBtn)),
-    h('div', { class: 'caption' }, h('div', { class: 's' }, 'Drop or paste files anywhere')));
+  return cell;
 }
 
 const isUrl = (s) => /^(https?:\/\/|www\.)\S+$/i.test(s);
@@ -578,7 +584,7 @@ function toast(message, { error = false, progress = false } = {}) {
   };
 }
 
-// ---------- header, folders, filters, tags ----------
+// ---------- header, folders, filters ----------
 
 function renderHeading() {
   const title = state.status?.title || 'Archive';
@@ -658,32 +664,6 @@ const loadFoldersSoon = () => {
   folderTimer = setTimeout(loadFolders, 1500);
 };
 
-let tagTimer;
-async function loadTags() {
-  clearTimeout(tagTimer);
-  const p = new URLSearchParams({ q: state.q, folder: state.folder, kind: state.kind, limit: 40 });
-  for (const t of state.tags) p.append('tag', t);
-  try {
-    const tags = await api(`/api/tags?${p}`);
-    $('#tag-strip').replaceChildren(
-      ...tags
-        .filter((t) => !state.tags.includes(t.tag))
-        .map((t) => h('a', {
-          class: 'chip',
-          href: urlFor({ tags: [...state.tags, t.tag], item: null }),
-          onclick: (e) => {
-            e.preventDefault();
-            applyFilters({ tags: [...state.tags, t.tag] });
-          },
-        }, t.tag, h('span', { class: 'n' }, t.n))),
-    );
-  } catch {}
-}
-const loadTagsSoon = () => {
-  clearTimeout(tagTimer);
-  tagTimer = setTimeout(loadTags, 2500);
-};
-
 let searchTimer;
 $('#q').addEventListener('input', (e) => {
   clearTimeout(searchTimer);
@@ -694,6 +674,12 @@ $('#q').addEventListener('keydown', (e) => {
     clearTimeout(searchTimer);
     applyFilters({ q: e.target.value.trim() });
   } else if (e.key === 'Escape') {
+    // Esc ends the search and folds the field back into the magnifier. (Browsers empty a search
+    // field on Esc without an input event, so the results have to be reset here.)
+    e.preventDefault();
+    clearTimeout(searchTimer);
+    e.target.value = '';
+    if (state.q) applyFilters({ q: '' });
     e.target.blur();
   }
 });
@@ -896,19 +882,6 @@ function fileBig(it, note) {
     h('a', { class: 'btn', href: `${it.file}?download=1` }, 'Download'));
 }
 
-function tagState(it) {
-  const t = state.status?.tagging;
-  if (it.tagStatus === 'error') {
-    return h('p', { class: 'tag-state error' }, `Couldn’t tag: ${it.tagError || 'unknown error'} `, h('button', { class: 'linkish', type: 'button', onclick: () => retag(it.id) }, 'Try again'));
-  }
-  if (it.tagStatus === 'tagging') return h('p', { class: 'tag-state' }, h('span', { class: 'tagging-dot' }), `${t?.label || 'The model'} is tagging this…`);
-  if (it.tagStatus === 'pending') {
-    if (!t?.enabled) return h('p', { class: 'tag-state' }, 'Auto-tagging is off.');
-    return h('p', { class: 'tag-state' }, h('span', { class: 'tagging-dot' }), t.needsApproval ? 'Waiting — tagging needs your OK (see the banner).' : 'Waiting to be tagged…');
-  }
-  return it.tagModel ? h('p', { class: 'tag-state' }, `Auto-tagged by ${it.tagModel}${it.taggedAt ? `, ${ago(it.taggedAt)}` : ''}. Dashed tags are yours.`) : null;
-}
-
 function renderDetail(it) {
   if (state.editing) return;
   const i = state.items.findIndex((x) => x.id === it.id);
@@ -933,9 +906,9 @@ function renderDetail(it) {
     if (!saved && input) input.value = typed; // keep what was typed if saving failed
     input?.focus();
   });
-  const userTags = new Set(it.userTags || []);
-  const tagChips = (it.tags || []).map((t) =>
-    h('span', { class: `chip${userTags.has(t) ? ' user' : ''}` },
+  // Only the tags you added yourself show here. The automatic ones stay out of sight: they're only there for search.
+  const tagChips = (it.userTags || []).map((t) =>
+    h('span', { class: 'chip' },
       h('a', {
         href: urlFor({ tags: [t], q: '', folder: '', kind: '', item: null }),
         style: 'text-decoration:none',
@@ -964,7 +937,6 @@ function renderDetail(it) {
     h('a', { class: 'btn ghost small', href: `${it.file}?download=1` }, 'Download'),
     // Only once the full text has loaded, so saving can never overwrite a note with a partial copy.
     it.editable && typeof it.text === 'string' ? h('button', { class: 'btn ghost small', type: 'button', onclick: () => startEdit(it) }, 'Edit') : null,
-    state.status?.tagging?.enabled ? h('button', { class: 'btn ghost small', type: 'button', onclick: () => retag(it.id) }, 'Re-tag') : null,
     h('button', { class: 'btn danger small', type: 'button', onclick: () => trash(it) }, 'Delete'),
   ];
 
@@ -981,8 +953,7 @@ function renderDetail(it) {
             applyFilters({ folder: it.folder });
           },
         }, it.folder || 'Top level'))),
-    it.aiTitle || it.summary ? h('p', { class: 'summary' }, it.aiTitle ? h('strong', {}, it.aiTitle) : null, it.aiTitle && it.summary ? h('br') : null, it.summary) : null,
-    h('section', {}, h('p', { class: 'label' }, 'Tags'), h('div', { class: 'tags' }, ...tagChips, tagInput), tagState(it)),
+    h('div', { class: 'tags' }, ...tagChips, tagInput),
     h('section', {}, h('p', { class: 'label' }, 'Info'), h('dl', {}, ...info)),
     h('div', { class: 'actions' }, ...actions),
     h('section', { hidden: true }, h('p', { class: 'label' }, 'Related'), related));
@@ -1017,17 +988,7 @@ async function patch(id, body) {
     const it = await api(`/api/items/${id}`, { method: 'PATCH', json: body });
     updateBlock(it);
     if (state.openId === id) renderDetail(it);
-    loadTagsSoon();
     return it;
-  } catch (err) {
-    toast(err.message, { error: true });
-  }
-}
-
-async function retag(id) {
-  try {
-    await api(`/api/items/${id}/retag`, { method: 'POST' });
-    toast('Asking for fresh tags…');
   } catch (err) {
     toast(err.message, { error: true });
   }
@@ -1112,7 +1073,6 @@ window.addEventListener('popstate', () => {
   if (urlFor({ item: null }) !== before) {
     renderFilters();
     load({ reset: true });
-    loadTags();
   }
   if (item) openDetail(item);
   else closeDetail({ fromHistory: true });
@@ -1135,7 +1095,6 @@ function connect() {
     if (state.openId === it.id && !state.editing) {
       api(`/api/items/${it.id}`).then((full) => state.openId === it.id && renderDetail(full)).catch(() => {});
     }
-    loadTagsSoon();
   });
   es.addEventListener('remove', (e) => {
     const { id } = JSON.parse(e.data);
@@ -1153,7 +1112,6 @@ const initialItem = readUrl();
 renderFilters();
 api('/api/status').then(renderStatus).catch(() => {});
 loadFolders();
-loadTags();
 load({ reset: true });
 if (initialItem) openDetail(initialItem);
 connect();

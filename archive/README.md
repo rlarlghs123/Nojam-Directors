@@ -15,11 +15,12 @@ or “fog long take” without typing tags by hand.
   each titled with its file name and format (`poster.jpg`). Set in Helvetica. Sub-folders work like channels.
 - **Search that just works.** Type any part of a word, in any language. It looks at file names, the text inside documents,
   and everything the AI wrote about each block. `#tag` filters by an exact tag.
-- **Automatic tags.** For every new block the AI writes a title, 6–12 tags, a one-line summary and hidden search keywords
-  (optionally with translations, so English tags can be found in Korean too). You can add or remove tags; your edits always win.
+- **Automatic tags, out of sight.** For every new block the AI writes 6–12 tags, a title, a one-line summary and search
+  keywords (optionally with translations, so English tags can be found in Korean too). None of it is shown: it's only there
+  for search, so the page stays just your files. Add tags of your own with **+ tag**.
   By default this runs for free on your own computer with [Ollama](https://ollama.com); Claude is an option for the most precise tags.
 
-<p align="center"><img src="docs/detail.jpg" alt="A block with its tags" width="49%"> <img src="docs/mobile.jpg" alt="On a phone" width="24%"></p>
+<p align="center"><img src="docs/detail.jpg" alt="An open block" width="49%"> <img src="docs/mobile.jpg" alt="On a phone" width="24%"></p>
 
 ---
 
@@ -145,20 +146,22 @@ to stay awake when the display is off.
 
 ## Using it
 
-- **Add things:** drag files anywhere onto the page, paste (⌘V) a screenshot, an image, a link or some text, or use the
-  **+ Add block** square: type a note or paste a link, then ⌘↵. Or just save files into the folder.
+- **Add things:** drag files anywhere onto the page, paste (⌘V) a screenshot, an image, a link or some text, or click the
+  **+** square to type a note or paste a link, then ⌘↵ (or **Add**). Or just save files into the folder.
 - **Links** are saved as small `.url` shortcut files (so they sync too) with a title, description and preview image.
   YouTube and Vimeo play right in the archive. Pasting a link to an image saves the image itself.
 - **Memos** are Markdown files. Open one and press **Edit** to change it; it's re-tagged after you save.
-- **Search:** any part of any word, any language. Combine words (`red poster`), use `#tag` for an exact tag,
-  and narrow down with folders (channels), the type filter and the tag strip. **Shuffle** is good for rediscovering things.
-- **Keyboard:** `/` or ⌘K to search, ← → to move between blocks, Esc to close.
+- **Search:** click the magnifier next to the title. Any part of any word, any language. Combine words (`red poster`),
+  use `#tag` for an exact tag, and narrow down with folders (channels) and the type filter. **Shuffle** is good for
+  rediscovering things.
+- **Your own tags:** open a block and press **+ tag**. Click one of your tags to see everything that has it.
+- **Keyboard:** `/` or ⌘K to search, ← → to move between blocks, Esc to close a block or end a search.
 - **Delete** moves the file to a `.trash` folder inside your library, so you can always get it back.
 
 ## Auto-tagging
 
 Pick who writes the tags with `TAGGER=` in `.env`; the default is `ollama`. You can switch any time: existing tags stay,
-new blocks use the new tagger, and **Re-tag** redoes a single block.
+and new blocks use the new tagger.
 
 | `TAGGER` | Cost | Limits | Where your files go |
 | --- | --- | --- | --- |
@@ -218,9 +221,9 @@ It answers with a title, tags, a summary and search keywords, as structured JSON
 at low effort, with Claude's server-side refusal fallback (`fallbacks: "default"`) switched on, so a rare policy decline is
 retried on another model automatically.
 
-- **Titles:** every block is titled with its file name and format (`IMG_2931.jpg`). The AI's title appears in bold above
-  the summary when you open a block, and it's searchable.
-- **Your edits win:** tags you add are shown with a dashed border; tags you remove stay removed, even after re-tagging.
+- **Only for search:** the page never shows what the AI wrote. Blocks are titled with their file name and format
+  (`IMG_2931.jpg`), and the AI's tags, title and summary are only used to find things.
+- **Your own tags** (**+ tag**) are the only tags shown; × removes one.
 - **Tags travel with your files:** they're also saved as small JSON files in `<library>/.archive/meta/`, keyed by the
   file's content. They sync with your drive, so a second computer (or a fresh install) gets every tag back without tagging
   again. Renaming or moving a file keeps its tags.
