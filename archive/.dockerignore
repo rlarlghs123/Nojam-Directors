@@ -1,0 +1,9 @@
+node_modules
+.env
+data
+library
+test
+docs
+*.log
+.DS_Store
+ollama
