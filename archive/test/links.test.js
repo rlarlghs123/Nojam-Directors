@@ -82,8 +82,8 @@ describe('link previews', () => {
     try {
       const { item } = await t.library.createLink(`${base}/article`, 'Links');
       assert.equal(item.kind, 'link');
-      assert.equal(item.title, 'Concrete & Light');
-      assert.equal(item.name, 'Concrete & Light.url');
+      assert.equal(item.title, 'Concrete & Light.url');
+      assert.equal(item.contentTitle, 'Concrete & Light');
       assert.ok(item.thumb);
       const file = await fs.readFile(path.join(t.config.libraryDir, 'Links', 'Concrete & Light.url'), 'utf8');
       assert.match(file, /URL=http:\/\/127\.0\.0\.1:\d+\/article/);

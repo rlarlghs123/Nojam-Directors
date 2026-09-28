@@ -33,7 +33,7 @@ function basicAuth(password) {
   };
 }
 
-/** Wire everything together. `client` lets tests swap in a fake Claude. */
+/** Wire everything together. `client` lets tests swap in a stand-in for the Anthropic SDK. */
 export async function createApp(config, { client } = {}) {
   await fsp.mkdir(config.dataDir, { recursive: true });
   if (config.ffmpegPath) setFfmpegPath(config.ffmpegPath);
@@ -138,7 +138,7 @@ export async function createApp(config, { client } = {}) {
 
   app.post('/api/items/:id/retag', (req, res) => {
     const { id } = itemOr404(req);
-    if (!tagger.enabled) throw httpError(409, 'Auto-tagging is not set up (add ANTHROPIC_API_KEY to archive/.env)');
+    if (!tagger.enabled) throw httpError(409, tagger.status().setupHint || 'Auto-tagging is turned off (AUTO_TAG=off)');
     tagger.retag(id);
     res.json({ ok: true });
   });

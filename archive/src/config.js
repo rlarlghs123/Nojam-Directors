@@ -32,11 +32,16 @@ export function loadConfig(overrides = {}) {
     port: num(env.PORT, 3000),
     password: env.ARCHIVE_PASSWORD || '',
     title: env.ARCHIVE_TITLE || 'Archive',
-    model: env.CLAUDE_MODEL || 'claude-opus-5',
+    // Who writes the tags: claude | ollama | gemini | openrouter | custom (see providers.js).
+    tagger: (env.TAGGER || 'claude').trim().toLowerCase(),
+    tagModel: env.TAG_MODEL || '', // empty = the provider's default model
+    tagUrl: env.TAG_API_URL || '',
+    tagKey: env.TAG_API_KEY || '',
+    model: env.CLAUDE_MODEL || 'claude-opus-5', // older setting, still honoured for Claude
     autoTag: (env.AUTO_TAG || 'on').toLowerCase() !== 'off',
     // First language = tag language; the rest are added as hidden search keywords.
     languages: (env.ARCHIVE_LANGUAGES || 'en').split(',').map((s) => s.trim()).filter(Boolean),
-    tagConcurrency: Math.max(1, num(env.TAG_CONCURRENCY, 2)),
+    tagConcurrency: Math.max(0, num(env.TAG_CONCURRENCY, 0)), // 0 = the provider's default
     // Ask before auto-tagging a backlog bigger than this (e.g. first scan of a big folder).
     confirmBacklog: num(env.TAG_CONFIRM_OVER, 50),
     rescanMinutes: num(env.RESCAN_MINUTES, 10),

@@ -3,7 +3,6 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { describe, test } from 'node:test';
 import { createApp } from '../src/app.js';
-import { isGenericName } from '../src/library.js';
 import { makeFixtures, poster } from './fixtures.js';
 import { fakeClaude, testApp, waitFor } from './helpers.js';
 
@@ -248,14 +247,5 @@ test('unsafe shortcuts and symlinks never become links or served files', async (
     assert.equal(await t.library.indexPath('link-to-outside.txt'), null);
   } finally {
     await t.close();
-  }
-});
-
-test('isGenericName spots camera and screenshot names', () => {
-  for (const n of ['IMG_2931', 'DSC01234', 'PXL_20260101_123456789', 'Screenshot 2026-09-02 at 11.04.51', '스크린샷 2026-09-02 오후 3.04.51', '1234567890', 'a3f9c2e1b7d04e2f9a1c', 'image', 'Untitled']) {
-    assert.equal(isGenericName(n), true, n);
-  }
-  for (const n of ['swiss jazz poster', 'Tarkovsky - Stalker', 'IMG_2931 fog study', '영화 메모']) {
-    assert.equal(isGenericName(n), false, n);
   }
 });

@@ -315,12 +315,12 @@ function frameFor(it) {
   const frame = h('div', { class: 'frame' });
   if (it.kind === 'font') {
     const el = h('div', { class: 'file-block font', 'data-font-id': it.id, 'data-font-url': it.file },
-      h('span', { style: `font-family: "archive-font-${it.id}", var(--serif)` }, 'Aa'),
+      h('span', { style: `font-family: "archive-font-${it.id}", var(--sans)` }, 'Aa'),
       h('span', { class: 'sample' }, it.meta?.family || it.title));
     fontObserver.observe(el);
     frame.append(el);
   } else if (it.kind === 'link') {
-    frame.append(h('div', { class: 'text-block link-text' }, h('strong', {}, it.title), h('div', { class: 'site' }, it.meta?.site || it.url || ''), it.excerpt ? h('div', { html: plainHtml(it.excerpt) }) : null));
+    frame.append(h('div', { class: 'text-block link-text' }, h('strong', {}, it.contentTitle || it.title), h('div', { class: 'site' }, it.meta?.site || it.url || ''), it.excerpt ? h('div', { html: plainHtml(it.excerpt) }) : null));
   } else if (it.excerpt) {
     const html = MARKDOWN.has(it.ext) ? markdown(it.excerpt) : plainHtml(it.excerpt);
     const label = it.kind === 'text' && !['md', 'markdown', 'txt', 'text'].includes(it.ext) ? kindLabel(it) : it.kind === 'pdf' ? kindLabel(it) : '';
@@ -331,11 +331,20 @@ function frameFor(it) {
   return frame;
 }
 
+/** The second caption line: size, length, pages or site. The format is already in the file name. */
+function facts(it) {
+  if (['image', 'design'].includes(it.kind) && it.width && it.height) return `${it.width} × ${it.height}`;
+  if (['video', 'audio'].includes(it.kind) && it.duration) return clock(it.duration);
+  if (it.kind === 'pdf' && it.pages) return `${it.pages} ${it.pages === 1 ? 'page' : 'pages'}`;
+  if (it.kind === 'link') return it.meta?.site || 'link';
+  return bytes(it.size);
+}
+
 function caption(it) {
   const pending = state.status?.tagging?.enabled && (it.tagStatus === 'pending' || it.tagStatus === 'tagging');
   return h('div', { class: 'caption' },
-    h('div', { class: 't' }, pending ? h('span', { class: 'tagging-dot', title: 'Claude is tagging this' }) : null, it.title),
-    h('div', { class: 's' }, `${kindLabel(it)} · ${shortDate(it.addedAt)}`));
+    h('div', { class: 't' }, pending ? h('span', { class: 'tagging-dot', title: 'Being tagged' }) : null, it.title),
+    h('div', { class: 's' }, `${facts(it)} · ${shortDate(it.addedAt)}`));
 }
 
 function block(it) {
@@ -760,14 +769,14 @@ function renderBanner() {
   } else if (t.enabled && t.needsApproval) {
     const cost = t.estimate != null ? ` (roughly ${money(t.estimate)} with ${t.model})` : '';
     content = [
-      h('p', {}, `${t.queued.toLocaleString()} blocks are waiting for Claude’s auto-tags${cost}. Tag them all now?`),
+      h('p', {}, `${t.queued.toLocaleString()} blocks are waiting for auto-tags${cost}. Tag them all now?`),
       h('div', { class: 'actions' },
         h('button', { class: 'btn small', type: 'button', onclick: () => post('start') }, 'Tag them all'),
         h('button', { class: 'btn small ghost', type: 'button', onclick: () => { bannerDismissed = true; renderBanner(); } }, 'Not now')),
     ];
   } else if (t.autoTag && !t.configured) {
     content = [
-      h('p', { html: 'Auto-tagging is off. Add your Anthropic API key to <code>archive/.env</code> as <code>ANTHROPIC_API_KEY=…</code> and restart the server. Search still works on file names and text.' }),
+      h('p', {}, `Auto-tagging is off. ${t.setupHint || ''} Search still works on file names and text.`),
       h('div', { class: 'actions' }, h('button', { class: 'btn small ghost', type: 'button', onclick: () => { bannerDismissed = true; renderBanner(); } }, 'Dismiss')),
     ];
   }
@@ -847,7 +856,7 @@ function stageFor(it) {
     case 'link': {
       const card = h('div', { class: 'link-card' },
         it.meta?.embed ? null : it.thumb ? h('img', { src: it.preview || it.thumb, alt: '' }) : null,
-        h('h2', {}, it.title),
+        h('h2', {}, it.contentTitle || it.title),
         it.excerpt ? h('p', {}, it.excerpt) : null,
         h('a', { class: 'btn', href: it.url, target: '_blank', rel: 'noopener noreferrer' }, `Open ${it.meta?.site || 'link'} ↗`));
       if (!it.meta?.embed) return card;
@@ -857,7 +866,7 @@ function stageFor(it) {
     }
     case 'font': {
       loadFont(it.id, it.file);
-      const face = `font-family: "archive-font-${it.id}", var(--serif)`;
+      const face = `font-family: "archive-font-${it.id}", var(--sans)`;
       return h('div', { class: 'specimen' },
         h('div', { class: 'xl', style: face, contenteditable: 'true', spellcheck: 'false' }, 'Aa Gg 가나'),
         h('div', { class: 'l', style: face, contenteditable: 'true', spellcheck: 'false' }, 'The quick brown fox jumps over the lazy dog'),
@@ -880,12 +889,12 @@ function tagState(it) {
   if (it.tagStatus === 'error') {
     return h('p', { class: 'tag-state error' }, `Couldn’t tag: ${it.tagError || 'unknown error'} `, h('button', { class: 'linkish', type: 'button', onclick: () => retag(it.id) }, 'Try again'));
   }
-  if (it.tagStatus === 'tagging') return h('p', { class: 'tag-state' }, h('span', { class: 'tagging-dot' }), 'Claude is tagging this…');
+  if (it.tagStatus === 'tagging') return h('p', { class: 'tag-state' }, h('span', { class: 'tagging-dot' }), `${t?.label || 'The model'} is tagging this…`);
   if (it.tagStatus === 'pending') {
     if (!t?.enabled) return h('p', { class: 'tag-state' }, 'Auto-tagging is off.');
-    return h('p', { class: 'tag-state' }, h('span', { class: 'tagging-dot' }), t.needsApproval ? 'Waiting — tagging needs your OK (see the banner).' : 'Waiting for Claude…');
+    return h('p', { class: 'tag-state' }, h('span', { class: 'tagging-dot' }), t.needsApproval ? 'Waiting — tagging needs your OK (see the banner).' : 'Waiting to be tagged…');
   }
-  return it.tagModel ? h('p', { class: 'tag-state' }, `Auto-tagged by Claude ${it.taggedAt ? ago(it.taggedAt) : ''}. Dashed tags are yours.`) : null;
+  return it.tagModel ? h('p', { class: 'tag-state' }, `Auto-tagged by ${it.tagModel}${it.taggedAt ? `, ${ago(it.taggedAt)}` : ''}. Dashed tags are yours.`) : null;
 }
 
 function renderDetail(it) {
@@ -897,11 +906,20 @@ function renderDetail(it) {
 
   const tagInput = h('input', { class: 'tag-input', placeholder: '+ tag', 'aria-label': 'Add a tag', enterkeyhint: 'done' });
   tagInput.addEventListener('keydown', async (e) => {
+    if (e.key === 'Escape') {
+      // First Esc clears what you typed, the next one closes the block.
+      if (tagInput.value) tagInput.value = '';
+      else closeDetail();
+      return;
+    }
     if (e.key !== 'Enter' || !tagInput.value.trim()) return;
     e.preventDefault();
-    const tags = tagInput.value.split(',').map((s) => s.trim()).filter(Boolean);
-    await patch(it.id, { addTags: tags });
-    $('.tag-input', detail)?.focus();
+    const typed = tagInput.value;
+    tagInput.value = '';
+    const saved = await patch(it.id, { addTags: typed.split(',').map((s) => s.trim()).filter(Boolean) });
+    const input = $('.tag-input', detail);
+    if (!saved && input) input.value = typed; // keep what was typed if saving failed
+    input?.focus();
   });
   const userTags = new Set(it.userTags || []);
   const tagChips = (it.tags || []).map((t) =>
@@ -951,13 +969,21 @@ function renderDetail(it) {
             applyFilters({ folder: it.folder });
           },
         }, it.folder || 'Top level'))),
-    it.summary ? h('p', { class: 'summary' }, it.summary) : null,
+    it.aiTitle || it.summary ? h('p', { class: 'summary' }, it.aiTitle ? h('strong', {}, it.aiTitle) : null, it.aiTitle && it.summary ? h('br') : null, it.summary) : null,
     h('section', {}, h('p', { class: 'label' }, 'Tags'), h('div', { class: 'tags' }, ...tagChips, tagInput), tagState(it)),
     h('section', {}, h('p', { class: 'label' }, 'Info'), h('dl', {}, ...info)),
     h('div', { class: 'actions' }, ...actions),
     h('section', { hidden: true }, h('p', { class: 'label' }, 'Related'), related));
 
+  // This view re-renders when fresh data arrives (e.g. tags landing), so keep a half-typed tag.
+  const prevInput = $('.tag-input', detail);
+  const sameItem = Number(detail.dataset.id) === it.id;
+  const draft = sameItem ? prevInput?.value : '';
+  const hadFocus = sameItem && prevInput && prevInput === document.activeElement;
+  detail.dataset.id = it.id;
   detail.replaceChildren(h('button', { class: 'close', type: 'button', 'aria-label': 'Close', onclick: () => closeDetail() }, '×'), stage, aside);
+  if (draft) tagInput.value = draft;
+  if (hadFocus) tagInput.focus();
   loadRelated(it.id, related);
 }
 
@@ -989,7 +1015,7 @@ async function patch(id, body) {
 async function retag(id) {
   try {
     await api(`/api/items/${id}/retag`, { method: 'POST' });
-    toast('Asking Claude for fresh tags…');
+    toast('Asking for fresh tags…');
   } catch (err) {
     toast(err.message, { error: true });
   }

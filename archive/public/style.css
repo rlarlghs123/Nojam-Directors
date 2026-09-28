@@ -10,8 +10,9 @@
   --warn: #b45309;
   --danger: #c81e1e;
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 10px 30px rgba(0, 0, 0, 0.1);
-  --sans: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
-  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "AppleMyungjo", "Noto Serif KR", serif;
+  /* Helvetica everywhere. It ships with macOS and iOS; Windows and Linux get their closest match
+     (Arial, Nimbus Sans). Hangul falls back to the system's Korean sans. */
+  --sans: Helvetica, "Helvetica Neue", Arial, "Nimbus Sans", "Liberation Sans", "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --cell: 220px;
   --gutter: 32px;
@@ -354,7 +355,6 @@ main { padding: 0 var(--gutter) 96px; }
 }
 .text-block {
   padding: 16px 16px 0;
-  font-family: var(--serif);
   font-size: 13.5px;
   line-height: 1.5;
   overflow-wrap: anywhere;
@@ -377,7 +377,6 @@ main { padding: 0 var(--gutter) 96px; }
   color: var(--muted);
   text-transform: uppercase;
 }
-.text-block.link-text { font-family: var(--sans); }
 .text-block.link-text strong { display: block; font-size: 14px; margin-bottom: 6px; }
 .text-block .site { color: var(--muted); font-size: 12px; margin-bottom: 8px; }
 
@@ -437,7 +436,6 @@ main { padding: 0 var(--gutter) 96px; }
   border: 0;
   outline: 0;
   background: transparent;
-  font-family: var(--serif);
   font-size: 13.5px;
   line-height: 1.5;
 }
@@ -482,13 +480,12 @@ main { padding: 0 var(--gutter) 96px; }
   align-self: start;
   width: min(100%, 680px);
   padding: 8px 0 40px;
-  font-family: var(--serif);
-  font-size: 17px;
-  line-height: 1.65;
+  font-size: 16px;
+  line-height: 1.6;
   overflow-wrap: anywhere;
 }
 .detail .reader.plain { white-space: pre-wrap; }
-.detail .reader h1, .detail .reader h2, .detail .reader h3 { font-family: var(--sans); letter-spacing: -0.01em; line-height: 1.25; }
+.detail .reader h1, .detail .reader h2, .detail .reader h3 { letter-spacing: -0.01em; line-height: 1.25; }
 .detail .reader h1 { font-size: 1.6em; }
 .detail .reader pre { font: 13px/1.5 var(--mono); background: var(--panel); padding: 12px; overflow: auto; white-space: pre-wrap; }
 .detail .reader code { font: 0.85em var(--mono); background: var(--panel); padding: 1px 4px; }
@@ -508,7 +505,6 @@ main { padding: 0 var(--gutter) 96px; }
   padding: 20px;
   border: 1px solid var(--fg);
   background: var(--bg);
-  font-family: var(--serif);
   font-size: 16px;
   line-height: 1.6;
   outline: none;

@@ -1,12 +1,10 @@
-import fs from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
-import Anthropic from '@anthropic-ai/sdk';
-import { imageForClaude } from './thumbs.js';
+import { createProvider, ProviderError } from './providers.js';
+import { imageForTagging } from './thumbs.js';
 import { nfc } from './util.js';
 
-// Auto-tagging with Claude. Every new block gets a title, tags, a summary and hidden search
-// keywords, so you can find things later without typing tags by hand.
+// Auto-tagging. Every new block gets a title, tags, a summary and hidden search keywords,
+// so you can find things later without typing tags by hand. Who writes them (Claude, a free
+// local model via Ollama, Gemini's free tier, …) is up to the provider (see providers.js).
 
 const TEXT_LIMIT = 16_000; // characters of a document sent for tagging (the whole text stays searchable)
 const MAX_TAGS = 15;
@@ -86,13 +84,6 @@ export function canonicalTags(tags, vocabulary) {
   return out.slice(0, MAX_TAGS);
 }
 
-function hasCredentials() {
-  const env = process.env;
-  return Boolean(
-    env.ANTHROPIC_API_KEY || env.ANTHROPIC_AUTH_TOKEN || env.ANTHROPIC_PROFILE || fs.existsSync(path.join(os.homedir(), '.config', 'anthropic')),
-  );
-}
-
 const duration = (s) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
 
 // USD per million tokens (input, output), for the rough estimate shown before tagging a backlog.
@@ -108,8 +99,6 @@ export function estimateCost(items, model) {
   return Math.round(items * (2500 * price[0] + 600 * price[1])) / 1e6;
 }
 
-class TagError extends Error {}
-
 export class Tagger {
   constructor({ config, store, library, thumbs, events, client }) {
     this.config = config;
@@ -117,8 +106,7 @@ export class Tagger {
     this.library = library;
     this.thumbs = thumbs;
     this.events = events;
-    this.configured = Boolean(client) || hasCredentials();
-    this.client = client || new Anthropic({ maxRetries: 4, timeout: 120_000 });
+    this.provider = createProvider(config, { client });
     this.system = systemPrompt(config.languages);
     this.queue = new Set();
     this.priority = new Set();
@@ -128,15 +116,13 @@ export class Tagger {
     this.needsApproval = false;
     this.paused = false;
     this.blockedUntil = 0;
+    this.busyStreak = 0;
     this.lastError = null;
-    const m = config.model;
-    // Model-specific request options: effort needs a recent model; server-side refusal fallbacks exist for Opus 5 / Fable 5.
-    this.useEffort = /^claude-(opus|sonnet|fable|mythos)-(5|4-[5-9])/.test(m);
-    this.useFallbacks = /^claude-(opus-5|fable-5)/.test(m);
+    this.concurrency = config.tagConcurrency || this.provider.concurrency;
   }
 
   get enabled() {
-    return this.config.autoTag && this.configured;
+    return this.config.autoTag && this.provider.configured;
   }
 
   /** Called after the first library scan, so a big backlog is noticed before any of it is sent. */
@@ -201,16 +187,21 @@ export class Tagger {
 
   status() {
     const queued = this.queue.size + this.priority.size;
+    const p = this.provider;
     return {
       enabled: this.enabled,
-      configured: this.configured,
+      configured: p.configured,
       autoTag: this.config.autoTag,
-      model: this.config.model,
+      provider: p.name,
+      label: p.label,
+      model: p.model,
+      free: p.free,
+      setupHint: p.configured ? null : p.setupHint,
       queued,
       active: this.active,
       paused: this.paused,
       needsApproval: this.needsApproval,
-      estimate: estimateCost(queued, this.config.model),
+      estimate: p.free ? 0 : estimateCost(queued, p.model),
       lastError: this.lastError,
     };
   }
@@ -227,7 +218,8 @@ export class Tagger {
       this.needsApproval = false;
       return undefined;
     }
-    if (!this.approved && this.queue.size > this.config.confirmBacklog) {
+    // Free providers cost nothing, so only paid ones ask before a big backlog.
+    if (!this.approved && !this.provider.free && this.queue.size > this.config.confirmBacklog) {
       this.needsApproval = true;
       return undefined;
     }
@@ -238,7 +230,7 @@ export class Tagger {
 
   pump() {
     if (!this.enabled || this.stopped) return;
-    while (this.active < this.config.tagConcurrency) {
+    while (this.active < this.concurrency) {
       const id = this.#next();
       if (id === undefined) break;
       this.active++;
@@ -277,7 +269,8 @@ export class Tagger {
         if (!this.stopped && this.store.getItem(id)) this.#handleError(id, err);
         return;
       }
-      // While Claude was looking, the file may have been deleted or edited (then it's queued again).
+      this.busyStreak = 0;
+      // While the model was looking, the file may have been deleted or edited (then it's queued again).
       if (this.stopped || this.store.getItem(id)?.hash !== row.hash) return;
       this.store.updateItem(id, {
         ai_title: result.title,
@@ -299,32 +292,24 @@ export class Tagger {
   }
 
   #handleError(id, err) {
-    const back = (status, message) => this.store.updateItem(id, { tag_status: status, tag_error: message });
-    if (err instanceof Anthropic.AuthenticationError || err instanceof Anthropic.PermissionDeniedError) {
-      back('pending', null);
-      this.queue.add(id);
-      this.paused = true;
-      this.lastError = 'Claude rejected the API key. Check ANTHROPIC_API_KEY in archive/.env, then press Resume.';
-    } else if (err instanceof Anthropic.NotFoundError) {
-      back('pending', null);
-      this.queue.add(id);
-      this.paused = true;
-      this.lastError = `Model "${this.config.model}" was not found. Check CLAUDE_MODEL in archive/.env.`;
-    } else if (err instanceof Anthropic.RateLimitError || err instanceof Anthropic.APIConnectionError || err instanceof Anthropic.InternalServerError) {
-      back('pending', null);
-      this.#backOff(60_000, id, `Claude is busy or unreachable (${err.status || err.message}). Retrying in a minute.`);
-    } else if (err instanceof Anthropic.APIError || err instanceof TagError) {
-      back('error', err.message.slice(0, 300));
-    } else if (err instanceof SyntaxError) {
-      back('error', 'Claude returned unreadable output');
+    const kind = err instanceof ProviderError ? err.kind : 'item';
+    const message = String(err.message).slice(0, 300);
+    if (kind === 'item') {
+      this.store.updateItem(id, { tag_status: 'error', tag_error: message });
     } else {
-      // The SDK couldn't send the request at all (no credentials, bad config).
-      back('pending', null);
+      this.store.updateItem(id, { tag_status: 'pending', tag_error: null });
       this.queue.add(id);
-      this.paused = true;
-      this.lastError = err.message.slice(0, 300);
+      if (kind === 'busy') {
+        // Wait as long as the service asks, else 1, 2, 4 … up to 30 minutes (a free daily quota may be used up).
+        this.busyStreak++;
+        const wait = err.retryAfter ?? Math.min(60_000 * 2 ** (this.busyStreak - 1), 30 * 60_000);
+        this.#backOff(wait, id, `${message} Trying again in ${Math.max(1, Math.round(wait / 60_000))} min.`);
+      } else {
+        this.paused = true; // auth / model / config: the settings need fixing first
+        this.lastError = message;
+      }
     }
-    console.error(`tagging ${id} failed: ${err.message}`);
+    console.error(`tagging ${id} failed: ${message}`);
   }
 
   #emitItem(id) {
@@ -339,7 +324,7 @@ export class Tagger {
     else if (row.thumb) src = this.thumbs.thumbPath(row.hash);
     if (!src) return null;
     try {
-      return await imageForClaude(src);
+      return await imageForTagging(src);
     } catch {
       return null;
     }
@@ -371,39 +356,19 @@ export class Tagger {
     return { text: lines.join('\n'), vocab };
   }
 
-  /** Ask Claude for { title, tags, summary, keywords, model }. */
+  /** Ask the provider for { title, tags, summary, keywords, model }. */
   async describe(row) {
     const image = await this.#image(row);
     const { text, vocab } = await this.#prompt(row);
-    const content = [];
-    if (image) content.push({ type: 'image', source: image });
-    content.push({ type: 'text', text });
-
-    const params = {
-      model: this.config.model,
-      max_tokens: 4000,
-      system: [{ type: 'text', text: this.system, cache_control: { type: 'ephemeral' } }],
-      messages: [{ role: 'user', content }],
-      output_config: {
-        format: { type: 'json_schema', schema: TAG_SCHEMA },
-        ...(this.useEffort ? { effort: 'low' } : {}),
-      },
-    };
-    const res = this.useFallbacks
-      ? await this.client.beta.messages.create({ ...params, betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' })
-      : await this.client.messages.create(params);
-
-    if (res.stop_reason === 'refusal') throw new TagError('Claude declined to describe this item');
-    if (res.stop_reason === 'max_tokens') throw new TagError('Claude’s answer was cut off');
-    const json = JSON.parse(res.content.filter((b) => b.type === 'text').map((b) => b.text).join(''));
+    const { json, model } = await this.provider.complete({ system: this.system, image, text, schema: TAG_SCHEMA });
     const tags = canonicalTags(Array.isArray(json.tags) ? json.tags : [], vocab);
-    if (!tags.length) throw new TagError('Claude returned no tags');
+    if (!tags.length) throw new ProviderError('item', 'The model returned no tags');
     return {
       title: String(json.title || '').trim().slice(0, 120) || null,
       tags,
       summary: String(json.summary || '').trim().slice(0, 600) || null,
       keywords: (Array.isArray(json.keywords) ? json.keywords : []).map((k) => nfc(String(k)).trim()).filter(Boolean).slice(0, 40),
-      model: res.model || this.config.model,
+      model,
     };
   }
 }

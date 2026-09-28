@@ -6,7 +6,7 @@ sharp.cache(false);
 
 const THUMB = 640; // grid thumbnails (WebP)
 const PREVIEW = 1600; // large JPEG previews for formats browsers can't show (HEIC, TIFF, PSD, RAW, video…)
-const CLAUDE = 1024; // what the tagger sends to Claude
+const TAGGING = 1024; // what the tagger sends to the model
 
 /**
  * Thumbnail/preview cache in DATA_DIR, keyed by content hash:
@@ -89,11 +89,11 @@ export class Thumbs {
   }
 }
 
-/** Downscale any image input to a JPEG Claude can read (≤1024 px). */
-export async function imageForClaude(input) {
+/** Downscale any image input to the JPEG sent for tagging (≤1024 px). */
+export async function imageForTagging(input) {
   const data = await sharp(input, { failOn: 'none', limitInputPixels: 1e9 })
     .rotate()
-    .resize(CLAUDE, CLAUDE, { fit: 'inside', withoutEnlargement: true })
+    .resize(TAGGING, TAGGING, { fit: 'inside', withoutEnlargement: true })
     .flatten({ background: '#ffffff' })
     .jpeg({ quality: 82 })
     .toBuffer();

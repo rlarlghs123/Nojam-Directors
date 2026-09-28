@@ -62,7 +62,8 @@ describe('tagging with Claude', () => {
       const item = t.library.present(t.store.getByPath('IMG_0001.jpg'), { full: true });
       assert.equal(item.tagStatus, 'done');
       assert.deepEqual(item.tags, ['reference', 'poster', 'kind-image']);
-      assert.equal(item.title, 'About IMG_0001.jpg'); // camera-roll names show Claude's title
+      assert.equal(item.title, 'IMG_0001.jpg'); // blocks are titled by file name and format
+      assert.equal(item.aiTitle, 'About IMG_0001.jpg');
       assert.equal(item.summary, 'A summary of IMG_0001.jpg.');
       // Hidden keywords are searchable.
       assert.equal(t.store.search({ q: '참고자료' }).total, 1);
@@ -138,7 +139,7 @@ describe('tagging with Claude', () => {
       mode = 'garbage';
       t.tagger.retag(a.id);
       await t.idle();
-      assert.equal(t.store.getItem(a.id).tag_error, 'Claude returned unreadable output');
+      assert.equal(t.store.getItem(a.id).tag_error, 'The model returned unreadable output');
 
       mode = 'auth';
       t.tagger.retag(a.id);

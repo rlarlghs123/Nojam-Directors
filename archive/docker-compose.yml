@@ -20,3 +20,7 @@ services:
       - ./data:/data
     # Uncomment to write files as your user instead of root (check the ids with `id`):
     # user: "1000:1000"
+    # Free tagging with Ollama running on this machine: set TAGGER=ollama and
+    # TAG_API_URL=http://host.docker.internal:11434 in .env, and uncomment:
+    # extra_hosts:
+    #   - "host.docker.internal:host-gateway"

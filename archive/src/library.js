@@ -41,17 +41,6 @@ export async function fingerprint(file, size) {
   return h.digest('hex').slice(0, 32);
 }
 
-/** Camera rolls, screenshots and downloads have names that say nothing; show Claude's title instead. */
-export function isGenericName(stem) {
-  const s = nfc(stem).trim();
-  return (
-    /^(screenshot|screen shot|스크린샷|화면 캡처|capture|캡처)/i.test(s) ||
-    /^(img|image|dsc[nf]?|pxl|mvimg|gopr|dji|vid|video|mov|photo|pic|untitled|download|pasted|scan|file|ig|fb|kakaotalk_photo)?[\s_-]*[\d\s_\-.:()]*$/i.test(s) ||
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-/i.test(s) ||
-    /^[0-9a-f_-]{12,}$/i.test(s)
-  );
-}
-
 export class Library {
   constructor({ config, store, thumbs, sidecars, events }) {
     this.root = config.libraryDir;
@@ -501,8 +490,6 @@ export class Library {
 
   present(row, { full = false } = {}) {
     if (!row) return null;
-    const stem = row.name.replace(/\.[^.]+$/, '');
-    const title = row.title || (row.ai_title && isGenericName(stem) ? row.ai_title : stem);
     const meta = row.meta ? JSON.parse(row.meta) : null;
     const item = {
       id: row.id,
@@ -517,7 +504,9 @@ export class Library {
       duration: row.duration,
       pages: row.pages,
       color: row.color,
-      title,
+      title: row.name, // blocks are titled by their file name and format, e.g. "IMG_2931.jpg"
+      contentTitle: row.title, // a link's page title, an HTML file's <title>
+      aiTitle: row.ai_title,
       excerpt: row.excerpt,
       url: row.url,
       meta,
@@ -534,7 +523,6 @@ export class Library {
     };
     if (full) {
       const tags = this.store.tagsFor(row.id);
-      item.aiTitle = row.ai_title;
       item.keywords = row.ai_keywords;
       item.tagModel = row.tag_model;
       item.taggedAt = row.tagged_at;

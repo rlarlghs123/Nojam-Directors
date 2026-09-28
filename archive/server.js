@@ -8,7 +8,9 @@ const server = app.listen(config.port, config.host, () => {
   const host = config.host === '0.0.0.0' ? 'localhost' : config.host;
   console.log(`\n  ${config.title} is running at http://${host}:${config.port}`);
   console.log(`  Library: ${config.libraryDir}`);
-  console.log(`  Auto-tags: ${tagger.enabled ? `on (${config.model})` : 'off — add ANTHROPIC_API_KEY to archive/.env to turn them on'}\n`);
+  const t = tagger.status();
+  const how = `${t.label}, ${t.model}${t.free ? ', free' : ''}`;
+  console.log(`  Auto-tags: ${t.enabled ? `on (${how})` : t.autoTag ? `off. ${t.setupHint}` : 'off (AUTO_TAG=off)'}\n`);
   if (config.host !== '127.0.0.1' && config.host !== 'localhost' && !config.password) {
     console.warn('  Warning: listening on the network without ARCHIVE_PASSWORD. Anyone on this network can open the archive.\n');
   }
