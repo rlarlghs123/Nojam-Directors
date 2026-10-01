@@ -1,4 +1,7 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import { beforeEach, describe, test } from 'node:test';
 import { openStore, parseQuery } from '../src/db.js';
 
@@ -106,11 +109,46 @@ describe('search', () => {
     assert.deepEqual(store.related(ids.memo).map((r) => r.id), [ids.link]);
   });
 
+  test('orders: newest, oldest, recently changed, A to Z; relevance is newest when not searching', () => {
+    store.updateItem(ids.memo, { mtime: 3000 });
+    store.updateItem(ids.link, { mtime: 2000 });
+    const order = (sort) => store.search({ sort }).rows.map((r) => r.id);
+    assert.deepEqual(order('new'), [ids.poster, ids.nested, ids.memo, ids.still, ids.link]);
+    assert.deepEqual(order('old'), [ids.link, ids.still, ids.memo, ids.nested, ids.poster]);
+    assert.deepEqual(order('updated').slice(0, 2), [ids.memo, ids.link]);
+    assert.deepEqual(names(store.search({ sort: 'alpha' })), ['grid study.png', 'IMG_2931.jpg', 'Stalker.url', 'swiss jazz poster.jpg', '영화 메모.md']);
+    assert.deepEqual(order('relevance'), order('new'));
+    assert.deepEqual(names(store.search({ q: 'poster', sort: 'alpha' })), ['grid study.png', 'swiss jazz poster.jpg']);
+  });
+
+  test('your description is searchable', () => {
+    store.updateItem(ids.still, { description: 'Opening shot for the river scene' });
+    assert.deepEqual(names(store.search({ q: 'river scene' })), ['IMG_2931.jpg']);
+    store.updateItem(ids.still, { description: null });
+    assert.equal(store.search({ q: 'river' }).total, 0);
+  });
+
   test('shuffle is stable for a seed', () => {
     const a = store.search({ sort: 'random', seed: 42 }).rows.map((r) => r.id);
     const b = store.search({ sort: 'random', seed: 42 }).rows.map((r) => r.id);
     assert.deepEqual(a, b);
   });
+});
+
+test('an index made by an older version gets the new columns', async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'archive-db-'));
+  try {
+    const file = path.join(dir, 'index.db');
+    const old = openStore(file);
+    old.db.exec('ALTER TABLE items DROP COLUMN description');
+    old.close();
+    const store = openStore(file);
+    const id = store.insertItem({ path: 'a.jpg', name: 'a.jpg', kind: 'image', added_at: 1, updated_at: 1, description: 'hello' });
+    assert.equal(store.getItem(id).description, 'hello');
+    store.close();
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true });
+  }
 });
 
 test('parseQuery splits words, quoted phrases and #tags', () => {

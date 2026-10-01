@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS items (
   thumb       INTEGER NOT NULL DEFAULT 0,
   preview     INTEGER NOT NULL DEFAULT 0,
   color       TEXT,
+  description TEXT,                      -- written by you in the block's panel
   ai_title    TEXT,
   ai_summary  TEXT,
   ai_keywords TEXT,
@@ -55,9 +56,16 @@ CREATE TABLE IF NOT EXISTS kv (k TEXT PRIMARY KEY, v TEXT);
 
 const ITEM_COLUMNS = [
   'path', 'folder', 'name', 'ext', 'kind', 'size', 'mtime', 'hash', 'width', 'height', 'duration', 'pages',
-  'title', 'excerpt', 'body', 'url', 'meta', 'thumb', 'preview', 'color', 'ai_title', 'ai_summary', 'ai_keywords',
+  'title', 'excerpt', 'body', 'url', 'meta', 'thumb', 'preview', 'color', 'description', 'ai_title', 'ai_summary', 'ai_keywords',
   'tag_status', 'tag_error', 'tag_model', 'tagged_at', 'added_at', 'updated_at',
 ];
+
+const ORDERS = {
+  new: 'items.added_at DESC, items.id DESC',
+  old: 'items.added_at ASC, items.id ASC',
+  updated: 'items.mtime DESC, items.id DESC',
+  alpha: 'items.name COLLATE NOCASE ASC, items.id ASC',
+};
 
 const bind = (v) => (v === undefined ? null : typeof v === 'boolean' ? Number(v) : v);
 const likeEscape = (s) => s.replace(/[\\%_]/g, (c) => '\\' + c);
@@ -79,6 +87,9 @@ export function openStore(file) {
   const db = new DatabaseSync(file);
   db.exec('PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;');
   db.exec(SCHEMA);
+  // Columns added after the first version: add them to an index made by an older version.
+  const have = new Set(db.prepare('PRAGMA table_info(items)').all().map((c) => c.name));
+  if (!have.has('description')) db.exec('ALTER TABLE items ADD COLUMN description TEXT');
   return new Store(db);
 }
 
@@ -230,7 +241,7 @@ export class Store {
       .map((r) => r.tag);
   }
 
-  /** Tag counts among the items matching the given search/filters (what the tag strip shows). */
+  /** Tag counts among the items matching the given search/filters. */
   tagCounts({ q = '', tags = [], folder = '', kinds = [], limit = 60 } = {}) {
     const f = this.#filter({ q, tags, folder, kinds });
     const sql = `SELECT tag, COUNT(*) AS n FROM tags
@@ -254,7 +265,7 @@ export class Store {
     this.q('INSERT INTO search (rowid, title, tags, meta, body) VALUES (?, ?, ?, ?, ?)').run(
       id,
       low(stem, it.title, it.ai_title),
-      low(this.visibleTags(id).join(' | ')),
+      low(this.visibleTags(id).join(' | '), it.description),
       low(it.folder, it.kind, it.ext, it.ai_summary, it.ai_keywords, it.url),
       low(it.body),
     );
@@ -310,13 +321,15 @@ export class Store {
     };
   }
 
+  /**
+   * `sort`: relevance (the default: best matches first when searching, else newest), new, old,
+   * updated (file last changed), alpha (by file name) or random (stable for a given `seed`).
+   */
   search({ q = '', tags = [], folder = '', kinds = [], sort = '', seed = 1, offset = 0, limit = 60 } = {}) {
     const { from, whereSql, params, ranked } = this.#filter({ q, tags, folder, kinds });
-    let order;
-    if (sort === 'old') order = 'items.added_at ASC, items.id ASC';
-    else if (sort === 'random') order = `((items.id * 1103515245 + ${Number(seed) | 0}) % 2147483647)`;
-    else if (ranked && sort !== 'new') order = 'bm25(search, 10.0, 8.0, 3.0, 1.0), items.added_at DESC';
-    else order = 'items.added_at DESC, items.id DESC';
+    let order = ORDERS[sort];
+    if (sort === 'random') order = `((items.id * 1103515245 + ${Number(seed) | 0}) % 2147483647)`;
+    else if (!order) order = ranked ? 'bm25(search, 10.0, 8.0, 3.0, 1.0), items.added_at DESC' : ORDERS.new;
 
     const total = this.q(`SELECT COUNT(*) AS n FROM ${from} ${whereSql}`).get(...params).n;
     const rows = this.q(`SELECT items.* FROM ${from} ${whereSql} ORDER BY ${order} LIMIT ? OFFSET ?`).all(
