@@ -9,24 +9,18 @@
   <meta name="color-scheme" content="light dark">
 </head>
 <body>
-  <header class="topbar">
-    <a class="brand" href="/" id="brand"><span id="brand-title">Archive</span></a>
-    <label class="search" title="Search (/)">
-      <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12.6 12.6 17 17" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
-      <input id="q" type="search" placeholder="Search" autocomplete="off" spellcheck="false" aria-label="Search">
-    </label>
-    <div class="top-actions">
-      <button id="status" class="status" type="button" hidden></button>
-      <button id="add-btn" class="btn" type="button">Add</button>
-    </div>
-  </header>
-
   <div id="banner" class="banner" hidden></div>
 
   <main>
     <section class="channel-head">
-      <h1 id="heading">All blocks</h1>
-      <p id="subheading" class="muted"></p>
+      <div class="title-line">
+        <h1 id="heading">Archive</h1>
+        <label class="search" title="Search (/)">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12.6 12.6 17 17" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+          <input id="q" type="search" placeholder="Search" autocomplete="off" spellcheck="false" aria-label="Search">
+        </label>
+      </div>
+      <p class="subline"><span id="subheading" class="muted"></span><button id="status" class="status" type="button" hidden></button></p>
     </section>
 
     <nav class="folders" id="folders" aria-label="Folders"></nav>

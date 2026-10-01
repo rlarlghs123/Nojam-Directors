@@ -598,14 +598,13 @@ fileInput.addEventListener('change', () => {
   uploadFiles([...fileInput.files]);
   fileInput.value = '';
 });
-$('#add-btn').addEventListener('click', () => fileInput.click());
 
 let dragDepth = 0;
 const dragHasContent = (e) => [...(e.dataTransfer?.types || [])].some((t) => t === 'Files' || t === 'text/uri-list');
 window.addEventListener('dragenter', (e) => {
   if (!dragHasContent(e)) return;
   dragDepth++;
-  $('#dropzone-label').textContent = `Drop to add to ${state.folder ? state.folder.split('/').pop() : $('#brand-title').textContent}`;
+  $('#dropzone-label').textContent = `Drop to add to ${state.folder ? state.folder.split('/').pop() : state.status?.title || 'Archive'}`;
   $('#dropzone').hidden = false;
 });
 window.addEventListener('dragleave', () => {
@@ -674,12 +673,12 @@ function toast(message, { error = false, progress = false } = {}) {
 function renderHeading() {
   const title = state.status?.title || 'Archive';
   const folderName = state.folder.split('/').pop();
-  let heading = state.q ? `“${state.q}”` : state.folder ? folderName : title;
+  // The heading names the place you're in; what you search for stays in the field next to it.
+  let heading = state.folder ? folderName : title;
   if (!state.q && !state.folder && state.tags.length === 1) heading = `#${state.tags[0]}`;
   $('#heading').textContent = heading;
   const bits = [`${state.total.toLocaleString()} ${state.total === 1 ? 'block' : 'blocks'}`];
   if (state.folder && state.folder.includes('/')) bits.push(`in ${state.folder.split('/').slice(0, -1).join(' / ')}`);
-  if (state.q && state.folder) bits.push(`in ${folderName}`);
   $('#subheading').textContent = bits.join(' · ');
   document.title = state.q ? `${state.q} – ${title}` : state.folder ? `${folderName} – ${title}` : title;
   $('#empty').hidden = !(state.done && !state.items.length);
@@ -889,11 +888,6 @@ $('#q').addEventListener('keydown', (e) => {
     e.target.blur();
   }
 });
-$('#brand').addEventListener('click', (e) => {
-  e.preventDefault();
-  $('#q').value = '';
-  applyFilters({ q: '', tags: [], folder: '', kind: '', sort: '' });
-});
 
 // ---------- status & tagging banner ----------
 
@@ -901,7 +895,6 @@ let bannerDismissed = false;
 function renderStatus(s) {
   const first = !state.status;
   state.status = s;
-  $('#brand-title').textContent = s.title;
   const t = s.tagging;
   const btn = $('#status');
   let cls = '';

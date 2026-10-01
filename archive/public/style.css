@@ -85,46 +85,21 @@ button { cursor: pointer; }
 }
 .linkish:hover { color: var(--fg); }
 
-/* ---------- top bar ---------- */
+/* ---------- search: a magnifier right after the heading ---------- */
 
-.topbar {
-  position: sticky;
-  top: 0;
-  z-index: 20;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  height: 56px;
-  padding: 0 var(--gutter);
-  padding-top: env(safe-area-inset-top);
-  background: color-mix(in srgb, var(--bg) 92%, transparent);
-  backdrop-filter: saturate(1.4) blur(12px);
-  -webkit-backdrop-filter: saturate(1.4) blur(12px);
-  border-bottom: 1px solid var(--line);
-}
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-weight: 600;
-  text-decoration: none;
-  white-space: nowrap;
-  letter-spacing: -0.01em;
-}
-/* Search is just a magnifier next to the title. Click it (or press /) and it opens into a field. */
+/* Click it (or press /) and it opens into a field set in the heading's size. */
 .search {
   display: flex;
   align-items: center;
   min-width: 0;
-  height: 32px;
   color: var(--fg);
   cursor: pointer;
 }
-.search svg { width: 17px; height: 17px; flex: none; }
+.search svg { width: 22px; height: 22px; flex: none; }
 .search input {
   width: 0;
   min-width: 0;
-  height: 24px;
+  height: 36px;
   padding: 0;
   border: 0;
   border-bottom: 1px solid var(--fg);
@@ -132,12 +107,15 @@ button { cursor: pointer; }
   outline: 0;
   background: transparent;
   color: var(--fg);
+  font-size: 28px;
+  letter-spacing: -0.02em;
   opacity: 0;
 }
-.search:focus-within, .search:has(input:not(:placeholder-shown)) { flex: 0 1 280px; gap: 8px; cursor: text; }
+.search input::placeholder { color: var(--faint); }
+/* open: it takes the rest of the heading's line (up to 380px), and only wraps under a long heading */
+.search:focus-within, .search:has(input:not(:placeholder-shown)) { flex: 1 1 140px; max-width: 380px; gap: 12px; cursor: text; }
 .search:focus-within input, .search:has(input:not(:placeholder-shown)) input { flex: 1; opacity: 1; }
 .search input::-webkit-search-cancel-button { cursor: pointer; }
-.top-actions { margin-left: auto; display: flex; align-items: center; gap: 12px; }
 .status {
   display: inline-flex;
   align-items: center;
@@ -172,7 +150,8 @@ button { cursor: pointer; }
 /* ---------- channel header & filters ---------- */
 
 main { padding: 0 var(--gutter) 96px; }
-.channel-head { padding: 40px 0 6px; }
+.channel-head { padding: calc(40px + env(safe-area-inset-top)) 0 6px; }
+.title-line { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 16px; }
 .channel-head h1 {
   margin: 0;
   font-size: 28px;
@@ -180,8 +159,10 @@ main { padding: 0 var(--gutter) 96px; }
   letter-spacing: -0.02em;
   line-height: 1.15;
   overflow-wrap: anywhere;
+  min-width: 0;
 }
 .channel-head p { margin: 6px 0 0; font-size: 13px; }
+.subline { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 14px; min-height: 24px; }
 
 .folders {
   display: flex;
@@ -792,15 +773,16 @@ a.trow:hover .c-name { text-decoration: underline; text-underline-offset: 3px; }
 
 @media (max-width: 640px) {
   :root { --gutter: 16px; --cell: 140px; }
-  .status .label { display: none; }
   .menus { gap: 20px; }
   .trow { grid-template-columns: 40px minmax(0, 1fr) auto; gap: 12px; }
   .trow .c-type, .trow .c-size, .trow .c-folder, .trow .c-updated { display: none; }
   .irow { grid-template-columns: minmax(0, 1fr) auto; gap: 12px; }
   .i-name { font-size: 16px; }
   .i-folder { display: none; }
-  .channel-head { padding-top: 24px; }
+  .channel-head { padding-top: calc(24px + env(safe-area-inset-top)); }
   .channel-head h1 { font-size: 22px; }
+  .search svg { width: 18px; height: 18px; }
+  .search input { height: 30px; font-size: 22px; }
   .grid { column-gap: 14px; row-gap: 18px; padding-top: 20px; }
   .filters-row { flex-wrap: wrap; }
   .text-block { font-size: 12px; padding: 10px 10px 0; }
