@@ -15,8 +15,9 @@ Nobody else can reach your archive.
 1. Go to [oracle.com/cloud/free](https://www.oracle.com/cloud/free/) and click **Start for free**.
 2. Enter your country, name and email, and confirm the email. Then set a password and a **Cloud Account Name**.
    Write that name down: you need it every time you sign in.
-3. **Home Region:** choose one near you, for example *South Korea Central (Seoul)*. You can't change it later, and the
-   free server can only be made there.
+3. **Home Region:** you can't change it later, and the free server can only be made there. In Korea, choose
+   **South Korea North (Chuncheon)**. From anywhere in Korea it's as fast as Seoul, and it usually still has free
+   Ampere servers when Seoul has run out. Elsewhere, choose the nearest region.
 4. Add your address and verify your card (a small temporary charge may appear; it's refunded), then start the trial.
 5. Wait for the email saying your account is ready. It can take a few minutes, sometimes longer. Sign in at
    [cloud.oracle.com](https://cloud.oracle.com) with your Cloud Account Name. The first time, Oracle may ask you to set
