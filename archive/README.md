@@ -117,6 +117,12 @@ and nobody else can reach it.
 Only on your home Wi-Fi instead? Set `HOST=0.0.0.0` **and** `ARCHIVE_PASSWORD=…` in `.env`, then open `http://<computer-ip>:3000`.
 Please don't expose the archive to the open internet.
 
+## Run it in the cloud, for free
+
+With this, no computer of yours has to stay on. [cloud/README.md](cloud/README.md) is a step-by-step guide to running
+the archive on Oracle Cloud's free server, with free tagging. Only your own devices can reach it, through Tailscale.
+A single setup line does all the work on the server.
+
 ## Keep it running on a Mac
 
 A Mac mini or an old laptop that stays on makes a good archive server. To start it automatically at login, save this as
