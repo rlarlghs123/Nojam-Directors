@@ -30,7 +30,8 @@ the account to **Pay As You Go** fixes both. Always Free things stay free; you'd
 limits, and this guide doesn't create any.
 
 1. Open the menu (☰, top left) → **Billing & Cost Management** → **Upgrade and Manage Payment**, and upgrade to
-   **Pay As You Go**. It can take a while to finish; Oracle emails you when it's done.
+   **Pay As You Go**. It can take a while to finish; Oracle emails you when it's done. **Wait for that email before
+   step 3**: before the upgrade, creating the server very often fails with "Out of capacity".
 2. Add a safety net: ☰ → **Billing & Cost Management** → **Budgets** → **Create Budget**. Choose **Monthly** and a
    budget of **1** (1 dollar, or the smallest amount in your currency). Add an alert at **100%** of actual spending,
    sent to your email. If anything ever starts to cost money, you'll know the same day.
@@ -41,8 +42,10 @@ limits, and this guide doesn't create any.
 
 - **Name:** `nojam-archive`
 - **Image and shape:**
-  - **Change shape** → **Virtual machine** → **Ampere** → tick `VM.Standard.A1.Flex`. Set **OCPUs: 4** and
-    **Memory: 24 GB**. It's marked *Always Free-eligible*.
+  - **Change shape** → **Virtual machine** → **Ampere** → tick `VM.Standard.A1.Flex`. It starts at its smallest
+    size (1 core OCPU, 6 GB memory). Open the arrow (▸) next to its name to show **Number of OCPUs** and
+    **Amount of memory (GB)**, set them to **4** and **24**, then click **Select shape**. It's marked
+    *Always Free-eligible*.
   - **Change image** → **Ubuntu** → **Canonical Ubuntu 24.04**. Pick the plain one, not "Minimal".
 - **Networking:** keep **Create new virtual cloud network** and **Create new public subnet**, and keep
   **Automatically assign public IPv4 address** switched on.
@@ -53,9 +56,12 @@ limits, and this guide doesn't create any.
 Click **Create**. After a minute or two the state turns **Running**. On the instance's page, find
 **Public IP address** and copy it.
 
-> **"Out of capacity"?** Oracle sometimes has no free Ampere servers left in a region. Try again in a few hours, or
-> wait until the Pay As You Go upgrade has finished. You can also use **2 OCPUs** and **12 GB**, which is enough for
-> the archive.
+> **"Out of capacity for shape VM.Standard.A1.Flex in availability domain AD-1"?** Oracle has no free Ampere servers
+> left in your region at the moment. The Korean regions have only one availability domain, so you can't pick another.
+> 1. Check the Pay As You Go upgrade has finished (step 2). In **Upgrade and Manage Payment**, your plan should read
+>    *Pay As You Go*. This fixes it most of the time.
+> 2. Try the smaller size, **2 OCPUs** and **12 GB**. It's still enough for the archive and its free tagging.
+> 3. Try again later. Servers free up through the day, often early in the morning or late at night.
 
 ## 4. Connect to the server from your Mac
 
