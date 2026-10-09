@@ -325,15 +325,16 @@ export class Library {
       });
     }
     this.store.setAllTags(id, { ai: ai.tags || [], user: side.user?.add || [], hidden: side.user?.hide || [] });
+    if (typeof side.user?.description === 'string') this.store.updateItem(id, { description: side.user.description || null });
   }
 
-  /** Persist an item's tags next to the file (see sidecar.js). */
+  /** Persist an item's tags and description next to the file (see sidecar.js). */
   async saveSidecar(id) {
     const it = this.store.getItem(id);
     if (!it?.hash) return;
     const bySource = { ai: [], user: [], hidden: [] };
     for (const t of this.store.tagsFor(id)) bySource[t.source]?.push(t.tag);
-    const data = { user: { add: bySource.user, hide: bySource.hidden } };
+    const data = { user: { add: bySource.user, hide: bySource.hidden, ...(it.description ? { description: it.description } : {}) } };
     if (it.tag_status === 'done') {
       data.ai = {
         title: it.ai_title,
@@ -507,6 +508,7 @@ export class Library {
       title: row.name, // blocks are titled by their file name and format, e.g. "IMG_2931.jpg"
       contentTitle: row.title, // a link's page title, an HTML file's <title>
       aiTitle: row.ai_title,
+      description: row.description || '',
       excerpt: row.excerpt,
       url: row.url,
       meta,

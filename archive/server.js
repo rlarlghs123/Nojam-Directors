@@ -11,7 +11,9 @@ const server = app.listen(config.port, config.host, () => {
   const t = tagger.status();
   const how = `${t.label}, ${t.model}${t.free ? ', free' : ''}`;
   console.log(`  Auto-tags: ${t.enabled ? `on (${how})` : t.autoTag ? `off. ${t.setupHint}` : 'off (AUTO_TAG=off)'}\n`);
-  if (config.host !== '127.0.0.1' && config.host !== 'localhost' && !config.password) {
+  // In Docker, ARCHIVE_BIND=127.0.0.1 (from .env) publishes the page on the server itself only, e.g. behind Tailscale.
+  const onNetwork = config.host !== '127.0.0.1' && config.host !== 'localhost' && process.env.ARCHIVE_BIND !== '127.0.0.1';
+  if (onNetwork && !config.password) {
     console.warn('  Warning: listening on the network without ARCHIVE_PASSWORD. Anyone on this network can open the archive.\n');
   }
 });

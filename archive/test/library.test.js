@@ -83,6 +83,7 @@ describe('library', () => {
     await first.idle();
     const id = first.store.getByPath('poster.jpg').id;
     first.store.addUserTag(id, 'favourite');
+    first.store.updateItem(id, { description: 'For the June screening' });
     await first.library.saveSidecar(id);
     const tagsBefore = first.store.visibleTags(id);
     await first.library.stop();
@@ -98,6 +99,7 @@ describe('library', () => {
       const row = second.store.getByPath('poster.jpg');
       assert.equal(row.tag_status, 'done');
       assert.deepEqual(second.store.visibleTags(row.id).sort(), tagsBefore.sort());
+      assert.equal(row.description, 'For the June screening');
     } finally {
       await second.close();
       await fs.rm(first.root, { recursive: true, force: true });

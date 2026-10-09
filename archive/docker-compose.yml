@@ -1,12 +1,14 @@
 # docker compose up -d   →   http://<server>:3000
 # First time only, download the free tagging model:
 #   docker compose exec ollama ollama pull qwen3-vl:8b-instruct
+# In the cloud, cloud/setup.sh does all of this for you (see cloud/README.md).
 services:
   archive:
     build: .
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      # ARCHIVE_BIND=127.0.0.1 in .env keeps the page on this server only (behind Tailscale, in the cloud).
+      - "${ARCHIVE_BIND:-0.0.0.0}:3000:3000"
     env_file:
       - path: .env        # ARCHIVE_PASSWORD, TAGGER, … (copy .env.example)
         required: false
@@ -23,8 +25,8 @@ services:
       - ./data:/data
     depends_on:
       - ollama
-    # Uncomment to write files as your user instead of root (check the ids with `id`):
-    # user: "1000:1000"
+    # ARCHIVE_USER=1000:1000 in .env writes files as your user instead of root (check the ids with `id`).
+    user: "${ARCHIVE_USER:-0:0}"
 
   # The free tagger (TAGGER=ollama, the default). On a CPU it takes a while per block; that's fine in the background.
   # Using Claude, Gemini or OpenRouter instead? Delete this service and the depends_on above.

@@ -4,7 +4,7 @@ import path from 'node:path';
 import { writeFileAtomic } from './util.js';
 
 /**
- * Tags are also saved next to your files, in <library>/.archive/meta/<content-hash>.json.
+ * Tags (and your descriptions) are also saved next to your files, in <library>/.archive/meta/<content-hash>.json.
  * The files sync with iCloud / Google Drive like everything else, so a fresh install
  * (or a second computer) gets all tags back without paying for Claude again.
  * Keyed by content hash, so renaming or moving a file keeps its tags.

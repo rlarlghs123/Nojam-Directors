@@ -58,6 +58,15 @@ describe('HTTP API', () => {
       assert.deepEqual(patched.body.hiddenTags, ['reference']);
       assert.ok(!patched.body.tags.includes('reference'));
 
+      // Describe it: saved as typed (trimmed), searchable, and clearable
+      const describe = (description) =>
+        json(`/api/items/${item.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ description }) });
+      assert.equal((await describe('  Poster for the June screening ')).body.description, 'Poster for the June screening');
+      assert.equal((await json(`/api/items?q=${encodeURIComponent('june screening')}`)).body.items[0].id, item.id);
+      assert.equal((await describe('')).body.description, '');
+      assert.equal((await json(`/api/items?q=${encodeURIComponent('june screening')}`)).body.total, 0);
+      assert.equal((await json('/api/items?sort=alpha')).status, 200);
+
       // The original file, with byte ranges (video seeking)
       const res = await fetch(`${t.base}${item.file}`, { headers: { Range: 'bytes=0-9' } });
       assert.equal(res.status, 206);
