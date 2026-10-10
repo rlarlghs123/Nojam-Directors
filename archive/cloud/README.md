@@ -4,8 +4,10 @@ Run the archive on a free server that's always on, so your Mac, PC and iPhone ca
 iPhone or Mac through [Tailscale](https://tailscale.com): a private, encrypted connection between your own devices.
 Nobody else can reach your archive.
 
-- **The server:** Oracle Cloud's *Always Free* Ampere server: 4 cores, 24 GB of memory, 150 GB of disk.
-- **Tagging:** free, by Ollama running on that server (about a minute per new picture, in the background).
+- **The server:** Oracle Cloud's *Always Free* Ampere server: up to 4 cores and 24 GB of memory, with 150 GB of disk.
+  The smallest size, 1 core and 6 GB, works too.
+- **Tagging:** free, by Ollama running on that server, in the background. It takes about a minute per new picture
+  with 4 cores, and a few minutes with 1 core.
 - **Cost:** nothing, as long as you use the settings below.
 - **You need:** about 45 minutes, your Mac (with Terminal), your iPhone, and a credit or debit card. Oracle uses the
   card to check who you are.
@@ -17,7 +19,8 @@ Nobody else can reach your archive.
    Write that name down: you need it every time you sign in.
 3. **Home Region:** you can't change it later, and the free server can only be made there. In Korea, choose
    **South Korea North (Chuncheon)**. From anywhere in Korea it's as fast as Seoul, and it usually still has free
-   Ampere servers when Seoul has run out. Elsewhere, choose the nearest region.
+   Ampere servers when Seoul has run out. If no Korean region is offered, choose **Japan East (Tokyo)** or
+   **Japan Central (Osaka)**; from Korea they work just as well. Elsewhere, choose the nearest region.
 4. Add your address and verify your card (a small temporary charge may appear; it's refunded), then start the trial.
 5. Wait for the email saying your account is ready. It can take a few minutes, sometimes longer. Sign in at
    [cloud.oracle.com](https://cloud.oracle.com) with your Cloud Account Name. The first time, Oracle may ask you to set
@@ -45,7 +48,8 @@ limits, and this guide doesn't create any.
   - **Change shape** → **Virtual machine** → **Ampere** → tick `VM.Standard.A1.Flex`. It starts at its smallest
     size (1 core OCPU, 6 GB memory). Open the arrow (▸) next to its name to show **Number of OCPUs** and
     **Amount of memory (GB)**, set them to **4** and **24**, then click **Select shape**. It's marked
-    *Always Free-eligible*.
+    *Always Free-eligible*. If you can't go above 1 and 6, or 4 and 24 fails with "Out of capacity", keep the smallest
+    size: the setup adapts to it, and you can make the server bigger later (see *Everyday use*).
   - **Change image** → **Ubuntu** → **Canonical Ubuntu 24.04**. Pick the plain one, not "Minimal".
 - **Networking:** keep **Create new virtual cloud network** and **Create new public subnet**, and keep
   **Automatically assign public IPv4 address** switched on.
@@ -60,7 +64,8 @@ Click **Create**. After a minute or two the state turns **Running**. On the inst
 > left in your region at the moment. The Korean regions have only one availability domain, so you can't pick another.
 > 1. Check the Pay As You Go upgrade has finished (step 2). In **Upgrade and Manage Payment**, your plan should read
 >    *Pay As You Go*. This fixes it most of the time.
-> 2. Try the smaller size, **2 OCPUs** and **12 GB**. It's still enough for the archive and its free tagging.
+> 2. Try a smaller size: **2 OCPUs** and **12 GB**, or the smallest, **1 OCPU** and **6 GB**. Both are enough for the
+>    archive. On a small server the setup uses a smaller tagging model and adds extra memory on disk (swap).
 > 3. Try again later. Servers free up through the day, often early in the morning or late at night.
 
 ## 4. Connect to the server from your Mac
@@ -131,6 +136,10 @@ The archive notices the new files by itself. Their tags and descriptions come al
 - **Change a setting:** on the server, run `nano ~/Nojam-Directors/archive/.env`. Change the line, save with
   Ctrl-O, Return, Ctrl-X, then run the setup line again. For better but slower tags, use
   `TAG_MODEL=qwen3-vl:8b-instruct`.
+- **Make the server bigger** (when Oracle has room, e.g. after the Pay As You Go upgrade): in Oracle, ☰ → **Compute**
+  → **Instances** → *nojam-archive* → **Edit** → **Edit shape**, raise **OCPUs** and **Memory** (up to 4 and 24),
+  and **Save changes**. The server restarts and everything comes back by itself. For better tags on the bigger server,
+  set `TAG_MODEL=qwen3-vl:4b-instruct` (see *Change a setting*).
 - **See what it's doing:** `cd ~/Nojam-Directors/archive && sudo docker compose logs --tail 50 archive`
 - **Restart everything:** `sudo reboot`. The archive and Tailscale start again by themselves.
 - **Back up:** your files now live only on the server. Now and then, copy them to your Mac:

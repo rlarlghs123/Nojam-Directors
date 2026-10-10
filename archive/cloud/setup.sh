@@ -13,7 +13,6 @@ REPO_URL="${REPO_URL:-https://github.com/rlarlghs123/Nojam-Directors.git}"
 BRANCH="${BRANCH:-main}"
 DIR="${DIR:-$HOME/Nojam-Directors}"
 TS_NAME="${TS_NAME:-nojam-archive}"   # the server's name in Tailscale: https://nojam-archive.<your-tailnet>.ts.net
-DEFAULT_MODEL="qwen3-vl:4b-instruct"  # about a minute per picture on 4 ARM cores; the 8b model is better but slower
 
 step() { printf '\n\033[1m%s\033[0m\n' "$*"; }
 # A new server spends its first minutes installing Ubuntu's own updates; wait for them instead of failing.
@@ -36,6 +35,10 @@ if [ "$OS_ID" != ubuntu ] || [ -z "$CODENAME" ]; then
 fi
 ME="$(id -un)"
 OWNER="$(id -u):$(id -g)"
+MEM_GB="$(awk '/^MemTotal:/ {printf "%d", $2 / 1048576 + 0.5}' /proc/meminfo)"
+# The tagging model has to fit in memory next to everything else: the 2b model needs about 3 GB, the 4b about 5 GB.
+# (The 8b model tags better but is slow on these processors; set it in .env if you like.)
+if [ "$MEM_GB" -lt 10 ]; then DEFAULT_MODEL="qwen3-vl:2b-instruct"; else DEFAULT_MODEL="qwen3-vl:4b-instruct"; fi
 
 step "1/5  Installing Docker and Tailscale"
 apt_get update
@@ -50,6 +53,17 @@ sudo curl -fsSL "https://pkgs.tailscale.com/stable/ubuntu/$CODENAME.tailscale-ke
 apt_get update
 apt_get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin tailscale
 sudo systemctl enable --now docker tailscaled
+# Some extra memory on disk (swap) keeps a small server from running out while it builds or tags.
+if [ "$MEM_GB" -lt 12 ]; then
+  if ! swapon --show=NAME --noheadings | grep -qx /swapfile; then
+    echo "This server has ${MEM_GB} GB of memory; adding 4 GB of swap."
+    sudo fallocate -l 4G /swapfile
+    sudo chmod 600 /swapfile
+    sudo mkswap /swapfile >/dev/null
+    sudo swapon /swapfile
+  fi
+  grep -q '^/swapfile ' /etc/fstab || echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab >/dev/null
+fi
 sudo usermod -aG docker "$ME" # lets you use `docker` without sudo from your next login
 
 step "2/5  Getting the archive"
@@ -91,7 +105,14 @@ for _ in $(seq 90); do
   sleep 2
 done
 echo "Downloading the tagging model $MODEL (a few GB, only the first time)…"
-sudo docker compose exec -T ollama ollama pull "$MODEL"
+if ! sudo docker compose exec -T ollama ollama pull "$MODEL"; then
+  [ "$MODEL" = "qwen3-vl:2b-instruct" ] || false # a model you chose yourself: stop, so you can check its name
+  MODEL="qwen3-vl:4b-instruct"
+  echo "Trying $MODEL instead…"
+  sudo docker compose exec -T ollama ollama pull "$MODEL"
+  sed -i "s/^TAG_MODEL=.*/TAG_MODEL=$MODEL/" .env
+  sudo docker compose up -d # restart the archive with the model it now has
+fi
 
 step "5/5  Connecting to Tailscale, your private way in"
 if ! sudo tailscale status >/dev/null 2>&1; then
